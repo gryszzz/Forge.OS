@@ -35,7 +35,8 @@ jobs:
 
       - name: Build (testnet config)
         env:
-          VITE_BASE_PATH: /Forge.OS/
+          # Dynamic base path for project pages, e.g. /Forge.OS/
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_KAS_API: ${{ vars.VITE_KAS_API || 'https://api-tn10.kaspa.org' }}
           VITE_KAS_EXPLORER: ${{ vars.VITE_KAS_EXPLORER || 'https://explorer-tn10.kaspa.org' }}
           VITE_KAS_NETWORK: ${{ vars.VITE_KAS_NETWORK || 'kaspa_testnet_10' }}

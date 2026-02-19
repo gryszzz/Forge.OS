@@ -3,7 +3,7 @@
 ForgeOS is a wallet-native Kaspa dashboard for running an AI-assisted trading agent simulation.
 
 It includes:
-- Wallet connection (Kasware + demo mode)
+- Wallet connection (Kasware + Kaspium + demo mode)
 - Agent creation wizard
 - Decision engine panel (Kelly, Monte Carlo, risk/confidence gating)
 - Action queue with manual/auto signing flows
@@ -25,12 +25,12 @@ It includes:
 - `forgeos-ui.tsx`: stable app export entry (re-exports `src/ForgeOS.tsx`)
 - `src/ForgeOS.tsx`: root shell/topbar + view routing
 - `src/components/ui/*`: base UI primitives (`Card`, `Btn`, `Inp`, etc.)
-- `src/components/WalletGate.tsx`: wallet connect gate
+- `src/components/WalletGate.tsx`: wallet connect gate (Kasware/Kaspium/demo)
 - `src/components/SigningModal.tsx`: signing confirmation modal
 - `src/components/wizard/*`: agent setup/deploy flow
 - `src/components/dashboard/*`: dashboard panels and core runtime UI
 - `src/api/kaspaApi.ts`: Kaspa API calls
-- `src/wallet/WalletAdapter.ts`: wallet mechanics (Kasware adapter)
+- `src/wallet/WalletAdapter.ts`: wallet mechanics (Kasware + Kaspium)
 - `src/quant/runQuantEngine.ts`: AI decision call + strict JSON parse
 - `src/log/seedLog.ts`: seeded log data + log colors
 - `src/constants.ts`, `src/tokens.ts`, `src/helpers.ts`: constants/design/helpers
@@ -39,6 +39,7 @@ It includes:
 - Node.js 18+
 - npm 9+
 - Optional: Kasware extension installed and unlocked
+- Optional: Kaspium mobile wallet
 
 ## Local Run
 ```bash
@@ -56,10 +57,26 @@ npm run preview
 
 Production assets are generated in `dist/`.
 
+## Environment Variables
+Defined in `.env.example`.
+
+Kaspa network:
+- `VITE_KAS_API`
+- `VITE_KAS_EXPLORER`
+- `VITE_KAS_NETWORK`
+- `VITE_KAS_NETWORK_LABEL`
+- `VITE_KAS_WS_URL`
+
+AI engine:
+- `VITE_AI_API_URL` (default: Anthropic Messages API)
+- `VITE_AI_MODEL`
+- `VITE_ANTHROPIC_API_KEY` (required when calling Anthropic directly)
+
 ## How To Use
 1. Launch app with `npm run dev`.
 2. Connect wallet:
-- `Kasware` for real extension flow
+- `Kasware` for extension flow
+- `Kaspium` for mobile deep-link flow
 - `Demo Mode` for UI simulation without extension
 3. Create agent in Wizard:
 - name, ROI target, capital per cycle, risk, execution mode
@@ -73,13 +90,23 @@ Production assets are generated in `dist/`.
 - `Log`: full runtime events
 - `Controls`: execution and risk toggles
 
-## Wallet Mechanics (Current Behavior)
-- `WalletGate` detects providers via `WalletAdapter.detect()`
-- Kasware connect uses:
+## Wallet Mechanics
+- `WalletAdapter.detect()` reports wallet support:
+- `kasware` (extension)
+- `kaspium` (deep-link flow)
+- Kasware connect path:
 - `requestAccounts()`
 - `getNetwork()`
-- Signing modal uses `sendKasware(toAddress, amountKas)` to broadcast
-- Demo mode simulates tx IDs and signing flow without extension
+- Kasware send path:
+- `sendKaspa(toAddress, sompi)`
+- Kaspium connect path:
+- user enters `kaspa:` address
+- adapter stores session with provider `kaspium`
+- Kaspium send path:
+- deep-link URL generated from `KASPIUM_DEEP_LINK_SCHEME`
+- app prompts user to paste broadcast `txid`
+- Demo mode:
+- simulates transaction signatures/txids locally
 
 ## Execution Modes
 - `manual`: every action requires signature
@@ -95,13 +122,17 @@ Defined in `src/constants.ts`:
 Dashboard logs and treasury panel display split accounting each cycle.
 
 ## AI Engine Notes
-`src/quant/runQuantEngine.ts` sends a prompt to:
-- `https://api.anthropic.com/v1/messages`
+`src/quant/runQuantEngine.ts` supports two patterns:
+- Direct Anthropic call (`VITE_AI_API_URL` points to `api.anthropic.com`):
+- requires `x-api-key` (`VITE_ANTHROPIC_API_KEY`)
+- requires `anthropic-version` header
+- Backend proxy call (`VITE_AI_API_URL` points to your server):
+- app sends `{ prompt, agent, kasData }`
+- server returns either `{ decision }` or direct decision JSON
 
-Important:
-- Current code sends only `Content-Type` header.
-- In real deployments, this endpoint requires authentication and should usually be called through a backend proxy (not directly from browser).
-- If not configured, intelligence runs will error and appear in the log panel.
+Recommendation for production:
+- Keep AI keys server-side.
+- Route AI requests through backend proxy.
 
 ## Kaspa Data Sources
 `src/api/kaspaApi.ts` uses:
@@ -111,6 +142,34 @@ Important:
 - `GET /info/blockdag`
 
 On failure, dashboard falls back to simulated DAG data so UI remains usable.
+
+## GitHub Pages Deployment
+Workflow: `.github/workflows/deploy-pages.yml`
+
+Behavior:
+- Builds on `main` pushes.
+- Uses dynamic base path:
+- `VITE_BASE_PATH=/${{ github.event.repository.name }}/`
+- Adds `.nojekyll` to `dist/`.
+- Publishes artifact with `actions/deploy-pages`.
+
+Expected URL for current user/repo:
+- `https://gryszzz.github.io/Forge.OS/`
+
+## Go-Live Checklist
+1. Set GitHub Actions repository variables for all `VITE_KAS_*` values.
+2. Set a production websocket endpoint for `VITE_KAS_WS_URL`.
+3. Point `VITE_AI_API_URL` to backend proxy.
+4. Keep `VITE_ANTHROPIC_API_KEY` out of public client deployments whenever possible.
+5. Verify pages build and deploy are green in GitHub Actions.
+6. Validate wallet flows on production URL:
+- Kasware connect/sign
+- Kaspium deep-link + txid handoff
+7. Run final checks:
+```bash
+npm run build
+npm run preview
+```
 
 ## Release / Packaging
 A release template exists at:
@@ -131,8 +190,10 @@ Then create GitHub release and attach:
 - run `npm install` again
 - Kasware not detected:
 - install/unlock extension, refresh page
+- Kaspium send not opening wallet:
+- verify mobile deep-link support and `KASPIUM_DEEP_LINK_SCHEME`
 - AI errors in Intelligence panel:
-- expected unless Anthropic auth/proxy is configured
+- confirm `VITE_AI_API_URL` + auth/proxy configuration
 - Build warning about chunk size:
 - non-blocking for now; optimize later with code-splitting
 

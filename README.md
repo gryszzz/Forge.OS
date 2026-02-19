@@ -3,7 +3,7 @@
 ForgeOS is a Kaspa-focused, wallet-native AI trading dashboard prototype.
 
 It provides:
-- Wallet-gated access (Kasware or demo mode)
+- Wallet-gated access (Kasware, Kaspium, or demo mode)
 - Agent setup wizard
 - AI decision panel (risk/confidence-based)
 - Action queue with signing workflow
@@ -16,6 +16,7 @@ It provides:
 - Node.js 18+
 - npm 9+
 - Optional: Kasware extension
+- Optional: Kaspium mobile wallet
 
 ### Install
 ```bash
@@ -37,8 +38,23 @@ npm run build
 npm run preview
 ```
 
+## Environment
+Create a `.env` file from `.env.example` and set values for your target environment.
+
+Core Kaspa settings:
+- `VITE_KAS_API`
+- `VITE_KAS_EXPLORER`
+- `VITE_KAS_NETWORK`
+- `VITE_KAS_NETWORK_LABEL`
+- `VITE_KAS_WS_URL` (for websocket/push feeds)
+
+AI settings:
+- `VITE_AI_API_URL` (Anthropic direct or your backend proxy)
+- `VITE_AI_MODEL`
+- `VITE_ANTHROPIC_API_KEY` (only if calling Anthropic directly from browser)
+
 ## How It Works
-1. Connect wallet (Kasware or demo mode).
+1. Connect wallet (Kasware, Kaspium, or demo mode).
 2. Configure and deploy an agent in the wizard.
 3. Use Dashboard tabs:
 - `Overview`: KPI/status summary
@@ -49,10 +65,32 @@ npm run preview
 - `Log`: event history
 - `Controls`: execution/risk controls
 
+## Wallet Support
+- `Kasware`: extension connection + signing/broadcast via wallet provider APIs.
+- `Kaspium`: mobile deep-link send flow with txid confirmation prompt.
+- `Demo`: full UI simulation without live wallet signing.
+
 ## Important Notes
 - Signing is wallet-native; keys are not stored by app code.
-- AI endpoint calls may fail without backend auth/proxy wiring.
+- Kaspium flow uses a deep-link handoff and manual txid confirmation.
+- AI endpoint calls may fail without auth/proxy wiring.
 - Kaspa data calls can use live polling or websocket stream (when configured).
+
+## Production Readiness Checklist
+1. Set repo-level Actions variables for all `VITE_KAS_*` values.
+2. Configure `VITE_KAS_WS_URL` to a reliable websocket endpoint for real-time push updates.
+3. For AI, use a backend proxy (`VITE_AI_API_URL`) instead of exposing secrets client-side.
+4. Verify CORS and rate limits for your Kaspa API provider.
+5. Run:
+```bash
+npm run build
+npm run preview
+```
+6. Validate wallet flows in browser:
+- Kasware connect/sign/send
+- Kaspium deep-link + txid confirmation
+7. Confirm GitHub Pages workflow succeeds and site loads from:
+- `https://gryszzz.github.io/Forge.OS/`
 
 ## Release Packaging
 ```bash
