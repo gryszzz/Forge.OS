@@ -1,4 +1,4 @@
-import { TREASURY } from "../../constants";
+import { DEFAULT_NETWORK, TREASURY } from "../../constants";
 import { shortAddr } from "../../helpers";
 import { C, mono } from "../../tokens";
 import { Btn, Card } from "../ui";
@@ -10,7 +10,7 @@ export const WStep3 = ({d, wallet, onDeploy}: any) => {
       <div style={{fontSize:17, color:C.text, fontWeight:700, marginBottom:3, ...mono}}>Review & Deploy</div>
       <div style={{fontSize:12, color:C.dim, marginBottom:18}}>Agent vault will be provisioned. Initial funding requires a wallet signature.</div>
       <Card p={0} style={{marginBottom:14}}>
-        {[["Agent", d.name || "—"], ["Wallet", shortAddr(wallet?.address)], ["Network", wallet?.network || "kaspa_mainnet"], ["ROI Target", `${d.kpiTarget}%`], ["Capital / Cycle", `${d.capitalLimit} KAS`], ["Risk", d.risk.toUpperCase()], ["Exec Mode", d.execMode.replace(/_/g, " ").toUpperCase()], ["Auto-Approve Under", `${d.autoApproveThreshold} KAS`]].map(([k,v],i,a)=>(
+        {[["Agent", d.name || "—"], ["Wallet", shortAddr(wallet?.address)], ["Network", wallet?.network || DEFAULT_NETWORK], ["ROI Target", `${d.kpiTarget}%`], ["Capital / Cycle", `${d.capitalLimit} KAS`], ["Risk", d.risk.toUpperCase()], ["Exec Mode", d.execMode.replace(/_/g, " ").toUpperCase()], ["Auto-Approve Under", `${d.autoApproveThreshold} KAS`]].map(([k,v],i,a)=>(
           <div key={k as any} style={{display:"flex", justifyContent:"space-between", padding:"9px 16px", borderBottom:i<a.length-1?`1px solid ${C.border}`:"none"}}>
             <span style={{fontSize:12, color:C.dim, ...mono}}>{k}</span>
             <span style={{fontSize:12, color:C.text, ...mono}}>{v}</span>

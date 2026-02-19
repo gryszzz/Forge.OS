@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_NETWORK, NETWORK_LABEL } from "../constants";
 import { C, mono } from "../tokens";
 import { WalletAdapter } from "../wallet/WalletAdapter";
 import { Badge, Card, Divider } from "./ui";
@@ -18,7 +19,7 @@ export function WalletGate({onConnect}: any) {
         throw new Error("Kaspium mobile: WalletConnect integration — coming in backend Phase 2.");
       } else {
         // Demo mode — no extension
-        session = { address:"kaspa:qp3t6flvhqd4d9jkk8m5v0xelwm6zxx99qx5p8f3j8vcm9y5la2vsnjsklav", network:"kaspa_mainnet", provider:"demo" };
+        session = { address:"kaspa:qp3t6flvhqd4d9jkk8m5v0xelwm6zxx99qx5p8f3j8vcm9y5la2vsnjsklav", network:DEFAULT_NETWORK, provider:"demo" };
       }
       onConnect(session);
     } catch(e: any) { setErr(e.message); }
@@ -60,7 +61,7 @@ export function WalletGate({onConnect}: any) {
         {err && <div style={{marginTop:14, padding:"10px 14px", background:C.dLow, borderRadius:4, fontSize:12, color:C.danger, ...mono}}>{err}</div>}
         <Divider m={18}/>
         <div style={{fontSize:11, color:C.dim, ...mono, lineHeight:1.6}}>
-          forge.os never requests your private key · All transaction signing happens in your wallet · Kaspa mainnet only
+          forge.os never requests your private key · All transaction signing happens in your wallet · {NETWORK_LABEL} only
         </div>
       </Card>
     </div>

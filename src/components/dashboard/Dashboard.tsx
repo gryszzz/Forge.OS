@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { AGENT_SPLIT, CONF_THRESHOLD, FEE_RATE, TREASURY, TREASURY_SPLIT } from "../../constants";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AGENT_SPLIT, CONF_THRESHOLD, FEE_RATE, KAS_WS_URL, TREASURY, TREASURY_SPLIT } from "../../constants";
 import { kasBalance, kasNetworkInfo } from "../../api/kaspaApi";
 import { fmtT, shortAddr, uid } from "../../helpers";
 import { runQuantEngine } from "../../quant/runQuantEngine";
@@ -15,6 +15,7 @@ import { TreasuryPanel } from "./TreasuryPanel";
 import { WalletPanel } from "./WalletPanel";
 
 export function Dashboard({agent, wallet}: any) {
+  const LIVE_POLL_MS = 5000;
   const [tab, setTab] = useState("overview");
   const [status, setStatus] = useState("RUNNING");
   const [log, setLog] = useState(()=>seedLog(agent.name));
@@ -26,28 +27,68 @@ export function Dashboard({agent, wallet}: any) {
   const [signingItem, setSigningItem] = useState(null as any);
   const [kasData, setKasData] = useState(null as any);
   const [kasDataLoading, setKasDataLoading] = useState(true);
+  const [kasDataError, setKasDataError] = useState(null as any);
+  const [liveConnected, setLiveConnected] = useState(false);
+  const [streamConnected, setStreamConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const addLog = useCallback((e: any)=>setLog((p: any)=>[{ts:Date.now(), ...e}, ...p]), []);
 
   // Fetch Kaspa on-chain data (no external APIs)
   const refreshKasData = useCallback(async()=>{
     setKasDataLoading(true);
+    setKasDataError(null);
     try{
       const [dag, bal] = await Promise.all([kasNetworkInfo(), kasBalance(wallet?.address)]);
       setKasData({ dag, walletKas: bal.kas, address: wallet?.address, fetched: Date.now() });
+      setLiveConnected(true);
     }catch(e){
-      // Graceful fallback with synthetic on-chain indicators
-      setKasData({ dag:{daaScore:89234567, difficulty:1.2e14, networkHashrate:"800 TH/s"}, walletKas:agent.capitalLimit, address:wallet?.address, fetched:Date.now(), simulated:true });
+      setLiveConnected(false);
+      setKasDataError((e as any)?.message || "Kaspa live feed disconnected");
     }
     setKasDataLoading(false);
   },[wallet,agent]);
 
-  useEffect(()=>{refreshKasData(); const id=setInterval(refreshKasData,90000); return()=>clearInterval(id);},[]);
+  useEffect(()=>{
+    refreshKasData();
+
+    if(KAS_WS_URL){
+      const ws = new WebSocket(KAS_WS_URL);
+      wsRef.current = ws;
+
+      ws.onopen = ()=>{
+        setStreamConnected(true);
+      };
+
+      ws.onmessage = ()=>{
+        refreshKasData();
+      };
+
+      ws.onerror = ()=>{
+        setStreamConnected(false);
+      };
+
+      ws.onclose = ()=>{
+        setStreamConnected(false);
+      };
+
+      return ()=>{
+        ws.close();
+      };
+    }
+
+    const id = setInterval(refreshKasData, LIVE_POLL_MS);
+    return ()=>clearInterval(id);
+  },[refreshKasData]);
 
   const riskThresh = agent.risk==="low"?0.4:agent.risk==="medium"?0.65:0.85;
 
   const runCycle = async()=>{
     if(status!=="RUNNING" || loading) return;
+    if(!kasData){
+      addLog({type:"ERROR", msg:"No live Kaspa data available. Reconnect feed before running cycle.", fee:null});
+      return;
+    }
     setLoading(true);
     addLog({type:"DATA", msg:`Kaspa DAG snapshot: DAA ${kasData?.dag?.daaScore||"—"} · Wallet ${kasData?.walletKas||"—"} KAS`, fee:null});
     try{
@@ -118,9 +159,17 @@ export function Dashboard({agent, wallet}: any) {
           <Badge text={status} color={status==="RUNNING"?C.ok:status==="PAUSED"?C.warn:C.danger} dot/>
           <Badge text={execMode.toUpperCase()} color={C.accent}/>
           <Badge text={wallet?.provider?.toUpperCase()||"WALLET"} color={C.purple} dot/>
-          {kasData && <Badge text={kasData.simulated?"DAG SIMULATED":"DAG LIVE"} color={kasData.simulated?C.warn:C.ok}/>}
+          <Badge text={liveConnected?"DAG LIVE":"DAG OFFLINE"} color={liveConnected?C.ok:C.danger} dot/>
+          <Badge text={KAS_WS_URL?(streamConnected?"STREAM LIVE":"STREAM DOWN"):"STREAM OFF"} color={KAS_WS_URL?(streamConnected?C.ok:C.warn):C.dim} dot/>
         </div>
       </div>
+
+      {!!kasDataError && (
+        <div style={{background:C.dLow,border:`1px solid ${C.danger}40`,borderRadius:6,padding:"11px 16px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+          <span style={{fontSize:12,color:C.danger,...mono}}>Kaspa live feed error (poll fallback): {kasDataError}</span>
+          <Btn onClick={refreshKasData} disabled={kasDataLoading} size="sm" variant="ghost">{kasDataLoading?"RECONNECTING...":"RECONNECT FEED"}</Btn>
+        </div>
+      )}
 
       {/* Pending signature alert */}
       {pendingCount>0 && (
@@ -167,7 +216,7 @@ export function Dashboard({agent, wallet}: any) {
               <Label>Actions</Label>
               <div style={{display:"flex", flexDirection:"column", gap:8}}>
                 <Btn onClick={runCycle} disabled={loading||status!=="RUNNING"} style={{padding:"10px 0"}}>{loading?"PROCESSING...":"RUN QUANT CYCLE"}</Btn>
-                <Btn onClick={refreshKasData} disabled={kasDataLoading} variant="ghost" style={{padding:"9px 0"}}>{kasDataLoading?"FETCHING DAG...":"REFRESH KASPA DATA"}</Btn>
+                <Btn onClick={refreshKasData} disabled={kasDataLoading} variant="ghost" style={{padding:"9px 0"}}>{kasDataLoading?"FETCHING DAG...":liveConnected?"REFRESH KASPA DATA":KAS_WS_URL?"RECONNECT STREAM/DATA":"RECONNECT KASPA FEED"}</Btn>
                 <Btn onClick={()=>setTab("queue")} variant="ghost" style={{padding:"9px 0"}}>ACTION QUEUE {pendingCount>0?`(${pendingCount})`:""}</Btn>
                 <Btn onClick={()=>setStatus((s: string)=>s==="RUNNING"?"PAUSED":"RUNNING")} variant="ghost" style={{padding:"9px 0"}}>{status==="RUNNING"?"PAUSE":"RESUME"}</Btn>
                 <Btn onClick={killSwitch} variant="danger" style={{padding:"9px 0"}}>KILL-SWITCH</Btn>

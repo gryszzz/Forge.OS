@@ -52,15 +52,13 @@ npm run preview
 ## Important Notes
 - Signing is wallet-native; keys are not stored by app code.
 - AI endpoint calls may fail without backend auth/proxy wiring.
-- Kaspa data calls have fallback simulation behavior for UI continuity.
+- Kaspa data calls can use live polling or websocket stream (when configured).
 
 ## Release Packaging
 ```bash
 npm run build
 zip -r forgeos-vX.Y.Z-dist.zip dist
 ```
-<img width="606" height="784" alt="Screenshot 2026-02-18 at 7 16 58 PM" src="https://github.com/user-attachments/assets/022b24ed-a079-4dc1-a51c-eaca2ea5ea68" />
-
 
 Use `GITHUB_RELEASE_TEMPLATE.md` when publishing a GitHub release.
 

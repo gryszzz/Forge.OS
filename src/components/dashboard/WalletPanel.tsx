@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { EXPLORER, KAS_API, NET_FEE, RESERVE } from "../../constants";
+import { DEFAULT_NETWORK, EXPLORER, KAS_API, NET_FEE, NETWORK_LABEL, RESERVE } from "../../constants";
 import { fmt } from "../../helpers";
 import { kasBalance, kasUtxos } from "../../api/kaspaApi";
 import { C, mono } from "../../tokens";
@@ -49,7 +49,7 @@ export function WalletPanel({agent, wallet}: any) {
       <Card p={20} style={{marginBottom:12}}>
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14}}>
           <div style={{flex:1, minWidth:0}}>
-            <Label>Connected Wallet — Kaspa Mainnet</Label>
+            <Label>Connected Wallet — {NETWORK_LABEL}</Label>
             <div style={{fontSize:12, color:C.accent, ...mono, wordBreak:"break-all", marginBottom:10}}>{wallet?.address || "—"}</div>
             <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
               <Btn onClick={()=>navigator.clipboard?.writeText(wallet?.address || "")} variant="ghost" size="sm">COPY</Btn>
@@ -63,7 +63,7 @@ export function WalletPanel({agent, wallet}: any) {
         </div>
         {err && <div style={{background:C.dLow, border:`1px solid ${C.danger}30`, borderRadius:4, padding:"8px 12px", marginBottom:12, fontSize:12, color:C.danger, ...mono}}>RPC: {err}</div>}
         <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12}}>
-          {[["Balance", `${liveKas ?? agent.capitalLimit} KAS`, liveKas?C.accent:C.warn], ["UTXOs", liveKas?String(utxos.length):"—", C.text], ["Network", wallet?.network||"kaspa_mainnet", C.dim]].map(([l,v,c])=> (
+          {[["Balance", `${liveKas ?? agent.capitalLimit} KAS`, liveKas?C.accent:C.warn], ["UTXOs", liveKas?String(utxos.length):"—", C.text], ["Network", wallet?.network||DEFAULT_NETWORK, C.dim]].map(([l,v,c])=> (
             <div key={l as any}><Label>{l}</Label><div style={{fontSize:18, color:c as any, fontWeight:700, ...mono}}>{v}</div></div>
           ))}
         </div>
