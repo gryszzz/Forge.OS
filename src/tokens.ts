@@ -1,12 +1,13 @@
 export const C = {
-  bg:"#060606", s1:"#0C0C0C", s2:"#111111", s3:"#161616",
-  border:"#1C1C1C", muted:"#252525",
-  accent:"#49EACB", aLow:"#071F1A",
-  text:"#E0E0E0", dim:"#505050",
-  danger:"#FF4444", dLow:"#220A0A",
-  warn:"#F0A500",  wLow:"#231600",
-  ok:"#3DDB82",    oLow:"#071A0E",
-  purple:"#9B59FF",
+  bg:"#05070A", s1:"#0B1118", s2:"#101923", s3:"#16222F",
+  border:"#213043", muted:"#32435A",
+  accent:"#39DDB6", aLow:"#112C2A",
+  text:"#EAF1F8", dim:"#8FA0B5",
+  danger:"#FF5D7A", dLow:"#311520",
+  warn:"#F7B267",  wLow:"#322515",
+  ok:"#4ADE80",    oLow:"#11261A",
+  purple:"#8F7BFF",
+  shadow:"0 18px 45px rgba(0,0,0,0.38)",
 };
 
-export const mono = { fontFamily:"'Courier New',monospace" };
+export const mono = { fontFamily:"'IBM Plex Mono','SFMono-Regular',Menlo,Monaco,monospace" };

@@ -4,7 +4,7 @@
     "name": "charts-vendor"
   },
   "index.html": {
-    "file": "assets/index-DUoH9Ue3.js",
+    "file": "assets/index-Bc2jfzUn.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -13,7 +13,7 @@
     ]
   },
   "src/main.tsx": {
-    "file": "assets/main-D0KvTml8.js",
+    "file": "assets/main-BtBYRDti.js",
     "name": "main",
     "src": "src/main.tsx",
     "isDynamicEntry": true,
