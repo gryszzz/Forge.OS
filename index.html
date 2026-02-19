@@ -13,13 +13,13 @@
 
       async function fetchManifest() {
         const candidates = [
-          `${repoBase}/manifest.json`,
-          `${repoBase}/dist/manifest.json`,
+          { url: `${repoBase}/manifest.json`, base: `${repoBase}/` },
+          { url: `${repoBase}/dist/manifest.json`, base: `${repoBase}/dist/` },
         ];
 
-        for(const url of candidates) {
-          const res = await fetch(url, { cache: "no-store" });
-          if(res.ok) return await res.json();
+        for(const c of candidates) {
+          const res = await fetch(c.url, { cache: "no-store" });
+          if(res.ok) return { manifest: await res.json(), base: c.base };
         }
 
         throw new Error("Manifest fetch failed in both Actions and branch deployment paths");
@@ -31,12 +31,15 @@
           return;
         }
 
-        const manifest = await fetchManifest();
-        const entry = manifest?.["index.html"]?.file || Object.values(manifest || {}).find((v) => v && v.isEntry)?.file;
+        const { manifest, base } = await fetchManifest();
+        const entry =
+          manifest?.["src/main.tsx"]?.file ||
+          manifest?.["index.html"]?.file ||
+          Object.values(manifest || {}).find((v) => v && (v.isEntry || v.isDynamicEntry))?.file;
+
         if(!entry) throw new Error("Could not resolve app entry from manifest");
 
-        const entryPath = entry.startsWith("assets/") ? `${repoBase}/${entry}` : `${repoBase}/dist/${entry}`;
-        await import(entryPath);
+        await import(`${base}${entry}`);
       }
 
       boot().catch((err) => {
