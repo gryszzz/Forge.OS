@@ -102,4 +102,8 @@ Use `GITHUB_RELEASE_TEMPLATE.md` when publishing a GitHub release.
 
 ## Developer Docs
 For architecture and implementation details, see:
-- `README.dev.md`
+- `README.dev.md
+-
+- `<img width="606" height="784" alt="Screenshot 2026-02-18 at 7 16 58 PM" src="https://github.com/user-attachments/assets/0a3763ad-7dcf-4f7e-8c1e-3c5192208377" />
+
+- 
