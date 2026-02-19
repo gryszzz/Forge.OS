@@ -93,15 +93,23 @@ AI settings:
 
 ## Overnight Go-Live + Domain
 1. Push to `main` to trigger deploy.
-2. In GitHub repo settings, set Actions variable:
-- `GH_PAGES_CNAME=yourdomain.com`
-3. In DNS provider, add:
-- `CNAME` record for `www` -> `gryszzz.github.io`
-- Optional apex root: `A` records to GitHub Pages IPs (if using root domain)
-4. Re-run `Deploy ForgeOS to GitHub Pages` workflow.
-5. Verify:
+2. Domain is committed in `public/CNAME` (`forge-os.xyz`) and auto-copied into deploy artifacts.
+3. In DNS provider, set records for root domain hosting on GitHub Pages:
+- `A` -> `185.199.108.153`
+- `A` -> `185.199.109.153`
+- `A` -> `185.199.110.153`
+- `A` -> `185.199.111.153`
+- `AAAA` -> `2606:50c0:8000::153`
+- `AAAA` -> `2606:50c0:8001::153`
+- `AAAA` -> `2606:50c0:8002::153`
+- `AAAA` -> `2606:50c0:8003::153`
+4. Optional `www` support:
+- `CNAME` `www` -> `gryszzz.github.io`
+5. In GitHub repo Settings -> Pages, set Custom domain to `forge-os.xyz` and enable `Enforce HTTPS`.
+6. Re-run `Deploy ForgeOS to GitHub Pages` workflow.
+7. Verify:
 - `https://gryszzz.github.io/Forge.OS/`
-- `https://yourdomain.com` (after DNS propagation)
+- `https://forge-os.xyz` (after DNS propagation)
 
 ## Core Docs
 - Developer architecture: `README.dev.md`
