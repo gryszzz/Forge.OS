@@ -44,6 +44,8 @@ const PROFILES: readonly KaspaNetworkProfile[] = [
   },
 ];
 
+export const KASPA_NETWORK_PROFILES = PROFILES;
+
 function normalize(raw: string) {
   return String(raw || "").trim().toLowerCase().replace(/_/g, "-");
 }

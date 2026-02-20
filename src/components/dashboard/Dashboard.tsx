@@ -4,8 +4,10 @@ import {
   ACCUMULATION_VAULT,
   AGENT_SPLIT,
   CONF_THRESHOLD,
+  EXPLORER,
   FEE_RATE,
   KAS_WS_URL,
+  NETWORK_LABEL,
   NET_FEE,
   RESERVE,
   TREASURY_SPLIT,
@@ -17,16 +19,16 @@ import { LOG_COL, seedLog } from "../../log/seedLog";
 import { C, mono } from "../../tokens";
 import { WalletAdapter } from "../../wallet/WalletAdapter";
 import { SigningModal } from "../SigningModal";
-import { Badge, Btn, Card, Label } from "../ui";
+import { Badge, Btn, Card, ExtLink, Label } from "../ui";
 import { EXEC_OPTS } from "../wizard/constants";
 import { ActionQueue } from "./ActionQueue";
-import { TreasuryPanel } from "./TreasuryPanel";
 import { WalletPanel } from "./WalletPanel";
 
 const PerfChart = lazy(() => import("./PerfChart").then((m) => ({ default: m.PerfChart })));
 const IntelligencePanel = lazy(() =>
   import("./IntelligencePanel").then((m) => ({ default: m.IntelligencePanel }))
 );
+const TreasuryPanel = lazy(() => import("./TreasuryPanel").then((m) => ({ default: m.TreasuryPanel })));
 
 export function Dashboard({agent, wallet}: any) {
   const LIVE_POLL_MS = 5000;
@@ -244,6 +246,9 @@ export function Dashboard({agent, wallet}: any) {
 
   const pendingCount = queue.filter((q: any)=>q.status==="pending").length;
   const totalFees = parseFloat(log.filter((l: any)=>l.fee).reduce((s: number, l: any)=>s+(l.fee||0),0).toFixed(4));
+  const liveKasNum = Number(kasData?.walletKas || 0);
+  const spendableKas = Math.max(0, liveKasNum - RESERVE - NET_FEE);
+  const lastDecision = decisions[0]?.dec;
   const TABS = [{k:"overview",l:"OVERVIEW"},{k:"intelligence",l:"INTELLIGENCE"},{k:"queue",l:`QUEUE${pendingCount>0?` (${pendingCount})`:""}`},{k:"treasury",l:"TREASURY"},{k:"wallet",l:"WALLET"},{k:"log",l:"LOG"},{k:"controls",l:"CONTROLS"}];
 
   return(
@@ -303,6 +308,34 @@ export function Dashboard({agent, wallet}: any) {
               <Card key={r.l} p={14}><Label>{r.l}</Label><div style={{fontSize:18, color:r.c, fontWeight:700, ...mono, marginBottom:2}}>{r.v}</div><div style={{fontSize:11, color:C.dim}}>{r.s}</div></Card>
             ))}
           </div>
+          <Card p={16} style={{marginBottom:12}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:8}}>
+              <Label>Mission Control</Label>
+              <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+                <Badge text={NETWORK_LABEL.toUpperCase()} color={DEFAULT_BADGE_COLOR(NETWORK_LABEL)} />
+                <Badge text={status} color={status==="RUNNING"?C.ok:C.warn} dot />
+                <Badge text={execMode.toUpperCase()} color={C.accent} />
+              </div>
+            </div>
+            <div style={{display:"grid", gridTemplateColumns:isTablet ? "1fr" : "1fr 1fr 1fr", gap:8, marginBottom:10}}>
+              <div style={{background:C.s2, border:`1px solid ${C.border}`, borderRadius:6, padding:"10px 12px"}}>
+                <div style={{fontSize:10, color:C.dim, ...mono, marginBottom:4}}>Spendable Balance</div>
+                <div style={{fontSize:13, color:C.ok, fontWeight:700, ...mono}}>{spendableKas.toFixed(4)} KAS</div>
+              </div>
+              <div style={{background:C.s2, border:`1px solid ${C.border}`, borderRadius:6, padding:"10px 12px"}}>
+                <div style={{fontSize:10, color:C.dim, ...mono, marginBottom:4}}>Last Decision</div>
+                <div style={{fontSize:13, color:C.text, fontWeight:700, ...mono}}>{lastDecision?.action || "—"}</div>
+              </div>
+              <div style={{background:C.s2, border:`1px solid ${C.border}`, borderRadius:6, padding:"10px 12px"}}>
+                <div style={{fontSize:10, color:C.dim, ...mono, marginBottom:4}}>Capital / Cycle</div>
+                <div style={{fontSize:13, color:C.text, fontWeight:700, ...mono}}>{agent.capitalLimit} KAS</div>
+              </div>
+            </div>
+            <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+              <ExtLink href={`${EXPLORER}/addresses/${wallet?.address}`} label="WALLET EXPLORER ↗" />
+              <ExtLink href={`${EXPLORER}/addresses/${ACCUMULATION_VAULT}`} label="VAULT EXPLORER ↗" />
+            </div>
+          </Card>
           <div style={{marginBottom:12}}>
             <Suspense fallback={<Card p={18}><Label>Performance</Label><div style={{fontSize:12,color:C.dim}}>Loading performance chart...</div></Card>}>
               <PerfChart decisions={decisions} kpiTarget={agent.kpiTarget}/>
@@ -338,7 +371,11 @@ export function Dashboard({agent, wallet}: any) {
         </Suspense>
       )}
       {tab==="queue" && <ActionQueue queue={queue} wallet={wallet} onSign={handleQueueSign} onReject={handleQueueReject}/>}
-      {tab==="treasury" && <TreasuryPanel log={log} agentCapital={agent.capitalLimit}/>}
+      {tab==="treasury" && (
+        <Suspense fallback={<Card p={18}><Label>Treasury</Label><div style={{fontSize:12,color:C.dim}}>Loading treasury panel...</div></Card>}>
+          <TreasuryPanel log={log} agentCapital={agent.capitalLimit}/>
+        </Suspense>
+      )}
       {tab==="wallet" && <WalletPanel agent={agent} wallet={wallet}/>}
 
       {/* ── LOG ── */}
@@ -399,4 +436,8 @@ export function Dashboard({agent, wallet}: any) {
       )}
     </div>
   );
+}
+
+function DEFAULT_BADGE_COLOR(networkLabel: string) {
+  return String(networkLabel || "").toLowerCase().includes("mainnet") ? C.warn : C.ok;
 }

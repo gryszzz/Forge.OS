@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { BarChart, Bar, CartesianGrid, Tooltip, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { AGENT_SPLIT, EXPLORER, TREASURY, TREASURY_SPLIT } from "../../constants";
 import { fmtT } from "../../helpers";
@@ -6,6 +7,20 @@ import { C, mono } from "../../tokens";
 import { Btn, Card, ExtLink, Label } from "../ui";
 
 export function TreasuryPanel({log, agentCapital}: any) {
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1200
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const isMobile = viewportWidth < 760;
+  const statsGrid = isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)";
+  const ledgerCols = isMobile ? "82px 58px 1fr" : "90px 60px 90px 90px 1fr";
+
   const feeEntries = log.filter((l: any)=>l.fee!=null);
   const totalFees  = parseFloat(feeEntries.reduce((s: number, l: any)=>s+(l.fee||0),0).toFixed(4));
   const treasuryCollected = parseFloat((totalFees*TREASURY_SPLIT).toFixed(4));
@@ -23,7 +38,7 @@ export function TreasuryPanel({log, agentCapital}: any) {
       <div style={{fontSize:13, color:C.text, fontWeight:700, ...mono, marginBottom:4}}>Treasury & Fee Routing</div>
       <div style={{fontSize:12, color:C.dim, marginBottom:16}}>All protocol fees split automatically: {(AGENT_SPLIT*100)}% agent pool · {(TREASURY_SPLIT*100)}% treasury.</div>
 
-      <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:14}}>
+      <div style={{display:"grid", gridTemplateColumns:statsGrid, gap:10, marginBottom:14}}>
         {[
           {l:"Total Fees Paid",   v:`${totalFees} KAS`,          c:C.text},
           {l:"Treasury Collected",v:`${treasuryCollected} KAS`,  c:C.warn},
@@ -64,11 +79,11 @@ export function TreasuryPanel({log, agentCapital}: any) {
           <span style={{fontSize:11, color:C.dim, ...mono}}>FEE LEDGER — ALL ENTRIES</span>
         </div>
         {feeEntries.slice(0,12).map((e: any, i: number)=> (
-          <div key={i} style={{display:"grid", gridTemplateColumns:"90px 60px 90px 90px 1fr", gap:8, padding:"8px 16px", borderBottom:`1px solid ${C.border}`, alignItems:"center"}}>
+          <div key={i} style={{display:"grid", gridTemplateColumns:ledgerCols, gap:8, padding:"8px 16px", borderBottom:`1px solid ${C.border}`, alignItems:"center"}}>
             <span style={{fontSize:11, color:C.dim, ...mono}}>{fmtT(e.ts)}</span>
             <span style={{fontSize:11, color:LOG_COL[e.type], ...mono, fontWeight:700}}>{e.type}</span>
-            <span style={{fontSize:12, color:C.text, ...mono}}>{e.fee} KAS</span>
-            <span style={{fontSize:11, color:C.warn, ...mono}}>{(e.fee*TREASURY_SPLIT).toFixed(4)} → tsy</span>
+            {!isMobile && <span style={{fontSize:12, color:C.text, ...mono}}>{e.fee} KAS</span>}
+            {!isMobile && <span style={{fontSize:11, color:C.warn, ...mono}}>{(e.fee*TREASURY_SPLIT).toFixed(4)} → tsy</span>}
             <span style={{fontSize:11, color:C.dim, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{e.msg}</span>
           </div>
         ))}

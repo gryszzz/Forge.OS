@@ -13,10 +13,13 @@ function runtimeNetworkOverride() {
   }
 }
 
-const ACTIVE_NETWORK = runtimeNetworkOverride() || env.VITE_KAS_NETWORK || "kaspa_testnet_10";
+const RUNTIME_NETWORK_OVERRIDE = runtimeNetworkOverride();
+const ACTIVE_NETWORK = RUNTIME_NETWORK_OVERRIDE || env.VITE_KAS_NETWORK || "kaspa_testnet_10";
 export const NETWORK_PROFILE = resolveKaspaNetwork(ACTIVE_NETWORK);
 export const DEFAULT_NETWORK = NETWORK_PROFILE.id;
-export const NETWORK_LABEL = env.VITE_KAS_NETWORK_LABEL || NETWORK_PROFILE.label;
+export const NETWORK_LABEL = RUNTIME_NETWORK_OVERRIDE
+  ? NETWORK_PROFILE.label
+  : (env.VITE_KAS_NETWORK_LABEL || NETWORK_PROFILE.label);
 export const ALLOWED_ADDRESS_PREFIXES = NETWORK_PROFILE.addressPrefixes;
 
 export const KAS_API =

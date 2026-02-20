@@ -6,6 +6,7 @@ It provides:
 - Wallet-gated access (Kasware, Kaspium, or demo mode)
 - Agent setup wizard
 - AI decision panel (risk/confidence-based)
+- Runtime network profile switcher (mainnet/testnet) from topbar
 - Action queue with signing workflow
 - Treasury fee split visibility
 - Wallet and UTXO operations panel
@@ -79,6 +80,7 @@ AI settings:
 - `VITE_AI_API_URL`
 - `VITE_AI_MODEL`
 - `VITE_ANTHROPIC_API_KEY` (only if calling Anthropic directly from browser)
+- `VITE_AI_FALLBACK_ENABLED` (default `true`, uses conservative deterministic fallback when AI endpoint is unavailable)
 
 ## Mainnet/Testnet Runtime Switch
 - Default profile comes from `VITE_KAS_NETWORK`.

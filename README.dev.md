@@ -6,6 +6,7 @@ It includes:
 - Wallet connection (Kasware + Kaspium + demo mode)
 - Agent creation wizard
 - Decision engine panel (Kelly, Monte Carlo, risk/confidence gating)
+- Runtime network selector in topbar (mainnet/testnet profiles with session reset guard)
 - Action queue with manual/auto signing flows
 - Treasury fee split and logs
 - Wallet operations panel (balance, UTXOs, withdraw flow)
@@ -101,6 +102,7 @@ AI engine:
 - `VITE_AI_API_URL` (default: Anthropic Messages API)
 - `VITE_AI_MODEL`
 - `VITE_ANTHROPIC_API_KEY` (required when calling Anthropic directly)
+- `VITE_AI_FALLBACK_ENABLED` (`true` by default; deterministic conservative fallback if upstream AI is unavailable)
 
 Runtime override:
 - Append `?network=mainnet` or `?network=testnet` to force a network profile without rebuilding.
