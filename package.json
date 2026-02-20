@@ -10,6 +10,7 @@
     "build:offline": "npm run build",
     "smoke": "node scripts/smoke.mjs",
     "domain:check": "node scripts/domain-health.mjs",
+    "domain:watch": "node scripts/domain-watch.mjs",
     "preview": "vite preview",
     "ci": "npm run typecheck && npm run build && npm run smoke"
   },

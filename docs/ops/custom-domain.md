@@ -43,6 +43,18 @@ Run from repo root:
 npm run domain:check
 ```
 
+Auto-watch (every 10 minutes by default):
+
+```bash
+npm run domain:watch
+```
+
+Override watch cadence:
+
+```bash
+DOMAIN_WATCH_INTERVAL_MINUTES=5 DOMAIN_WATCH_MAX_CHECKS=48 npm run domain:watch
+```
+
 Expected healthy output:
 - `A records match GitHub Pages: YES`
 - `www CNAME -> gryszzz.github.io: YES`
@@ -62,7 +74,11 @@ If GitHub Pages shows `InvalidDNSError`:
 
 4. Wait and retry after DNS TTL/registry propagation.
 
-5. If still unresolved after several hours, contact registrar support and ask:
+5. If DNS resolves but you get GitHub 404 page ("There isn't a GitHub Pages site here"):
+- Re-save `forge-os.xyz` in GitHub `Settings -> Pages -> Custom domain`.
+- Wait for cert issuance, then enable `Enforce HTTPS`.
+
+6. If still unresolved after several hours, contact registrar support and ask:
 - “Please confirm delegation for `forge-os.xyz` is published in `.xyz` registry.”
 
 ## Notes

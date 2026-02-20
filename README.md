@@ -40,6 +40,11 @@ npm run ci
 npm run domain:check
 ```
 
+### Domain Auto-Watch
+```bash
+npm run domain:watch
+```
+
 ### Build (Production)
 ```bash
 npm run build

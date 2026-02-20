@@ -29,8 +29,15 @@ async function resolveSafe(type, host) {
 
 async function fetchSafe(url) {
   try {
-    const res = await fetch(url, { method: "HEAD", redirect: "manual" });
-    return { ok: true, status: res.status, location: res.headers.get("location") || "" };
+    const res = await fetch(url, { method: "GET", redirect: "manual" });
+    const body = await res.text();
+    return {
+      ok: true,
+      status: res.status,
+      location: res.headers.get("location") || "",
+      server: res.headers.get("server") || "",
+      bodySample: body.slice(0, 500).toLowerCase(),
+    };
   } catch (error) {
     return { ok: false, error: error?.message || "HTTP_ERROR" };
   }
@@ -46,6 +53,10 @@ function hasAll(actualValues, expectedSet) {
 
 function printSection(title) {
   console.log(`\n=== ${title} ===`);
+}
+
+function normalizeHost(value) {
+  return String(value || "").toLowerCase().replace(/\.$/, "");
 }
 
 async function main() {
@@ -88,7 +99,8 @@ async function main() {
   printSection("Readiness");
   const aReady = a.ok && hasAll(a.values, GITHUB_PAGES_A);
   const aaaaReady = aaaa.ok && hasAll(aaaa.values, GITHUB_PAGES_AAAA);
-  const cnameReady = altCname.ok && altCname.values.some((v) => v.toLowerCase() === "gryszzz.github.io.");
+  const cnameReady =
+    altCname.ok && altCname.values.some((v) => normalizeHost(v) === "gryszzz.github.io");
   const httpsReady = httpsRoot.ok && httpsRoot.status >= 200 && httpsRoot.status < 500;
 
   console.log(`A records match GitHub Pages: ${aReady ? "YES" : "NO"}`);
@@ -99,6 +111,29 @@ async function main() {
   if (!ns.ok && (a.error === "ENOTFOUND" || a.error === "ENODATA" || a.error === "ENOTIMP")) {
     console.log("Status: Domain delegation appears pending. This is common right after registration.");
     process.exitCode = 2;
+    return;
+  }
+
+  const hasGitHubNotFoundBody = (sample) =>
+    String(sample || "").includes("there isn't a github pages site here") ||
+    String(sample || "").includes("site not found") ||
+    String(sample || "").includes("github pages");
+
+  const github404 =
+    (httpRoot.ok &&
+      httpRoot.status === 404 &&
+      /github/i.test(httpRoot.server || "") &&
+      hasGitHubNotFoundBody(httpRoot.bodySample)) ||
+    (httpsRoot.ok &&
+      httpsRoot.status === 404 &&
+      /github/i.test(httpsRoot.server || "") &&
+      hasGitHubNotFoundBody(httpsRoot.bodySample));
+
+  if (github404) {
+    console.log("Status: DNS is routed to GitHub Pages, but custom-domain binding is not active yet.");
+    console.log("Action: In GitHub repo Settings -> Pages, set Custom domain to the root domain and save again.");
+    console.log("Then wait for certificate issuance and enable Enforce HTTPS.");
+    process.exitCode = 1;
     return;
   }
 
@@ -115,4 +150,3 @@ main().catch((error) => {
   console.error("Domain health check failed:", error?.message || error);
   process.exitCode = 1;
 });
-

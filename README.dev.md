@@ -65,6 +65,16 @@ npm run preview
 npm run domain:check
 ```
 
+## Domain Watch Mode
+```bash
+npm run domain:watch
+```
+
+Optional watch overrides:
+```bash
+DOMAIN_WATCH_INTERVAL_MINUTES=5 DOMAIN_WATCH_MAX_CHECKS=48 npm run domain:watch
+```
+
 Production assets are generated in `dist/`.
 
 ## Environment Variables
