@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ACCUMULATE_ONLY,
   ACCUMULATION_VAULT,
@@ -11,6 +11,7 @@ import {
   FREE_CYCLES_PER_DAY,
   KAS_WS_URL,
   LIVE_EXECUTION_DEFAULT,
+  DEFAULT_NETWORK,
   NETWORK_LABEL,
   NET_FEE,
   RESERVE,
@@ -23,6 +24,7 @@ import { LOG_COL, seedLog } from "../../log/seedLog";
 import { C, mono } from "../../tokens";
 import { WalletAdapter } from "../../wallet/WalletAdapter";
 import { consumeUsageCycle, getUsageState } from "../../runtime/usageQuota";
+import { readPersistedDashboardState, writePersistedDashboardState } from "../../runtime/persistentState";
 import { SigningModal } from "../SigningModal";
 import { Badge, Btn, Card, ExtLink, Label } from "../ui";
 import { EXEC_OPTS } from "../wizard/constants";
@@ -39,9 +41,14 @@ const TreasuryPanel = lazy(() => import("./TreasuryPanel").then((m) => ({ defaul
 export function Dashboard({agent, wallet}: any) {
   const LIVE_POLL_MS = 5000;
   const STREAM_RECONNECT_MAX_DELAY_MS = 12000;
-  const execModeStorageKey = `forgeos.execMode.${agent?.agentId || agent?.name || "default"}`;
-  const liveExecutionStorageKey = `forgeos.liveExecution.${agent?.agentId || agent?.name || "default"}`;
+  const MAX_QUEUE_ENTRIES = 160;
+  const MAX_LOG_ENTRIES = 320;
+  const MAX_DECISION_ENTRIES = 120;
   const cycleIntervalMs = AUTO_CYCLE_SECONDS * 1000;
+  const usageScope = `${DEFAULT_NETWORK}:${String(wallet?.address || "unknown").toLowerCase()}`;
+  const runtimeScope = `${DEFAULT_NETWORK}:${String(wallet?.address || "unknown").toLowerCase()}:${String(agent?.agentId || agent?.name || "default").toLowerCase()}`;
+  const cycleLockRef = useRef(false);
+  const [runtimeHydrated, setRuntimeHydrated] = useState(false);
   const [tab, setTab] = useState("overview");
   const [status, setStatus] = useState("RUNNING");
   const [log, setLog] = useState(()=>seedLog(agent.name));
@@ -57,14 +64,17 @@ export function Dashboard({agent, wallet}: any) {
   const [liveConnected, setLiveConnected] = useState(false);
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamRetryCount, setStreamRetryCount] = useState(0);
-  const [usage, setUsage] = useState(() => getUsageState(FREE_CYCLES_PER_DAY));
+  const [usage, setUsage] = useState(() => getUsageState(FREE_CYCLES_PER_DAY, usageScope));
   const [liveExecutionArmed, setLiveExecutionArmed] = useState(LIVE_EXECUTION_DEFAULT);
   const [nextAutoCycleAt, setNextAutoCycleAt] = useState(() => Date.now() + cycleIntervalMs);
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1200
   );
 
-  const addLog = useCallback((e: any)=>setLog((p: any)=>[{ts:Date.now(), ...e}, ...p]), []);
+  const addLog = useCallback(
+    (e: any) => setLog((p: any) => [{ ts: Date.now(), ...e }, ...p].slice(0, MAX_LOG_ENTRIES)),
+    [MAX_LOG_ENTRIES]
+  );
 
   // Fetch Kaspa on-chain data (no external APIs)
   const refreshKasData = useCallback(async()=>{
@@ -82,46 +92,62 @@ export function Dashboard({agent, wallet}: any) {
   },[wallet]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const saved = window.localStorage.getItem(execModeStorageKey);
-      if (saved && EXEC_OPTS.some((opt) => opt.v === saved)) {
-        setExecMode(saved);
+    setUsage(getUsageState(FREE_CYCLES_PER_DAY, usageScope));
+  }, [usageScope]);
+
+  useEffect(() => {
+    setRuntimeHydrated(false);
+    const persisted = readPersistedDashboardState(runtimeScope);
+
+    if (persisted) {
+      if (persisted.status) setStatus(persisted.status);
+      if (persisted.execMode && EXEC_OPTS.some((opt) => opt.v === persisted.execMode)) {
+        setExecMode(persisted.execMode);
+      } else {
+        setExecMode(agent.execMode || "manual");
       }
-    } catch {
-      // Ignore localStorage read issues in restricted environments.
-    }
-  }, [execModeStorageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(execModeStorageKey, execMode);
-    } catch {
-      // Ignore localStorage write issues in restricted environments.
-    }
-  }, [execMode, execModeStorageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const saved = window.localStorage.getItem(liveExecutionStorageKey);
-      if (saved === "true" || saved === "false") {
-        setLiveExecutionArmed(saved === "true");
+      if (typeof persisted.liveExecutionArmed === "boolean") {
+        setLiveExecutionArmed(persisted.liveExecutionArmed);
+      } else {
+        setLiveExecutionArmed(LIVE_EXECUTION_DEFAULT);
       }
-    } catch {
-      // Ignore localStorage read issues in restricted environments.
+      setQueue(Array.isArray(persisted.queue) ? persisted.queue.slice(0, MAX_QUEUE_ENTRIES) : []);
+      setLog(
+        Array.isArray(persisted.log) && persisted.log.length > 0
+          ? persisted.log.slice(0, MAX_LOG_ENTRIES)
+          : seedLog(agent.name)
+      );
+      setDecisions(Array.isArray(persisted.decisions) ? persisted.decisions.slice(0, MAX_DECISION_ENTRIES) : []);
+      setNextAutoCycleAt(
+        Number.isFinite(persisted.nextAutoCycleAt)
+          ? Math.max(Date.now() + 1000, Number(persisted.nextAutoCycleAt))
+          : Date.now() + cycleIntervalMs
+      );
+    } else {
+      setStatus("RUNNING");
+      setExecMode(agent.execMode || "manual");
+      setLiveExecutionArmed(LIVE_EXECUTION_DEFAULT);
+      setQueue([]);
+      setDecisions([]);
+      setLog(seedLog(agent.name));
+      setNextAutoCycleAt(Date.now() + cycleIntervalMs);
     }
-  }, [liveExecutionStorageKey]);
+
+    setRuntimeHydrated(true);
+  }, [agent.execMode, agent.name, cycleIntervalMs, runtimeScope, MAX_DECISION_ENTRIES, MAX_LOG_ENTRIES, MAX_QUEUE_ENTRIES]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(liveExecutionStorageKey, liveExecutionArmed ? "true" : "false");
-    } catch {
-      // Ignore localStorage write issues in restricted environments.
-    }
-  }, [liveExecutionArmed, liveExecutionStorageKey]);
+    if (!runtimeHydrated) return;
+    writePersistedDashboardState(runtimeScope, {
+      status: status as "RUNNING" | "PAUSED" | "SUSPENDED",
+      execMode: execMode as "autonomous" | "manual" | "notify",
+      liveExecutionArmed,
+      queue,
+      log,
+      decisions,
+      nextAutoCycleAt,
+    });
+  }, [decisions, execMode, liveExecutionArmed, log, nextAutoCycleAt, queue, runtimeHydrated, runtimeScope, status]);
 
   useEffect(()=>{
     refreshKasData();
@@ -223,27 +249,29 @@ export function Dashboard({agent, wallet}: any) {
   const riskThresh = agent.risk==="low"?0.4:agent.risk==="medium"?0.65:0.85;
 
   const runCycle = async()=>{
-    if(status!=="RUNNING" || loading) return;
-    if(!kasData){
-      addLog({type:"ERROR", msg:"No live Kaspa data available. Reconnect feed before running cycle.", fee:null});
-      return;
-    }
-    setNextAutoCycleAt(Date.now() + cycleIntervalMs);
+    if (cycleLockRef.current || status!=="RUNNING" || !runtimeHydrated) return;
+    cycleLockRef.current = true;
     setLoading(true);
-    addLog({type:"DATA", msg:`Kaspa DAG snapshot: DAA ${kasData?.dag?.daaScore||"—"} · Wallet ${kasData?.walletKas||"—"} KAS`, fee:null});
-    const usageAfterConsume = consumeUsageCycle(FREE_CYCLES_PER_DAY);
-    setUsage(usageAfterConsume);
-    if (usageAfterConsume.locked) {
-      setLoading(false);
-      setTab("billing");
-      addLog({
-        type:"SYSTEM",
-        msg:`Daily free cycle quota reached (${usageAfterConsume.used}/${usageAfterConsume.limit}). Upgrade required for additional runs.`,
-        fee:null,
-      });
-      return;
-    }
     try{
+      if(!kasData){
+        addLog({type:"ERROR", msg:"No live Kaspa data available. Reconnect feed before running cycle.", fee:null});
+        return;
+      }
+
+      setNextAutoCycleAt(Date.now() + cycleIntervalMs);
+      addLog({type:"DATA", msg:`Kaspa DAG snapshot: DAA ${kasData?.dag?.daaScore||"—"} · Wallet ${kasData?.walletKas||"—"} KAS`, fee:null});
+      const usageAfterConsume = consumeUsageCycle(FREE_CYCLES_PER_DAY, usageScope);
+      setUsage(usageAfterConsume);
+      if (usageAfterConsume.locked) {
+        setTab("billing");
+        addLog({
+          type:"SYSTEM",
+          msg:`Daily free cycle quota reached (${usageAfterConsume.used}/${usageAfterConsume.limit}). Upgrade required for additional runs.`,
+          fee:null,
+        });
+        return;
+      }
+
       const dec = await runQuantEngine(agent, kasData||{});
       const decSource = dec?.decision_source === "fallback" ? "fallback" : "ai";
       if (ACCUMULATE_ONLY && !["ACCUMULATE", "HOLD"].includes(dec.action)) {
@@ -280,7 +308,7 @@ export function Dashboard({agent, wallet}: any) {
         addLog({type:"EXEC", msg:"HOLD — waiting for available balance", fee:0.03});
       } else {
         addLog({type:"VALID", msg:`Risk OK (${dec.risk_score}) · Conf OK (${dec.confidence_score}) · Kelly ${(dec.kelly_fraction*100).toFixed(1)}%`, fee:null});
-        setDecisions((p: any)=>[{ts:Date.now(), dec, kasData, source:decSource}, ...p]);
+        setDecisions((p: any)=>[{ts:Date.now(), dec, kasData, source:decSource}, ...p].slice(0, MAX_DECISION_ENTRIES));
 
         if (execMode === "notify") {
           addLog({type:"EXEC", msg:`NOTIFY mode active — ${dec.action} signal recorded, no transaction broadcast.`, fee:0.01});
@@ -301,7 +329,6 @@ export function Dashboard({agent, wallet}: any) {
           }
           if (!(amountKas > 0)) {
             addLog({type:"EXEC", msg:"HOLD — computed execution amount is zero", fee:0.03});
-            setLoading(false);
             return;
           }
           const txItem = {
@@ -334,26 +361,30 @@ export function Dashboard({agent, wallet}: any) {
 
               addLog({type:"EXEC", msg:`AUTO-APPROVED: ${dec.action} · ${txItem.amount_kas} KAS · txid: ${txid.slice(0,16)}...`, fee:0.08});
               addLog({type:"TREASURY", msg:`Fee split → Pool: ${(FEE_RATE*AGENT_SPLIT).toFixed(4)} KAS / Treasury: ${(FEE_RATE*TREASURY_SPLIT).toFixed(4)} KAS`, fee:FEE_RATE});
-              setQueue((p: any)=>[{...txItem, status:"signed", txid}, ...p]);
+              setQueue((p: any)=>[{...txItem, status:"signed", txid}, ...p].slice(0, MAX_QUEUE_ENTRIES));
             } catch (e: any) {
-              setQueue((p: any)=>[txItem, ...p]);
+              setQueue((p: any)=>[txItem, ...p].slice(0, MAX_QUEUE_ENTRIES));
               addLog({type:"SIGN", msg:`Auto-approve fallback to manual queue: ${e?.message || "wallet broadcast failed"}`, fee:null});
             }
           } else {
             addLog({type:"SIGN", msg:`Action queued for wallet signature: ${dec.action} · ${txItem.amount_kas} KAS`, fee:null});
-            setQueue((p: any)=>[txItem, ...p]);
+            setQueue((p: any)=>[txItem, ...p].slice(0, MAX_QUEUE_ENTRIES));
           }
         } else {
           addLog({type:"EXEC", msg:"HOLD — no action taken", fee:0.08});
         }
       }
     }catch(e: any){addLog({type:"ERROR", msg:e.message, fee:null});}
-    setLoading(false);
+    finally {
+      setLoading(false);
+      cycleLockRef.current = false;
+    }
   };
 
   useEffect(() => {
-    if (status !== "RUNNING") return;
+    if (status !== "RUNNING" || !runtimeHydrated) return;
     const tickId = setInterval(() => {
+      if (cycleLockRef.current) return;
       if (loading) return;
       if (!liveConnected || kasDataError) return;
       if (Date.now() < nextAutoCycleAt) return;
@@ -361,7 +392,7 @@ export function Dashboard({agent, wallet}: any) {
       void runCycle();
     }, 1000);
     return () => clearInterval(tickId);
-  }, [status, loading, liveConnected, kasDataError, nextAutoCycleAt, cycleIntervalMs, runCycle]);
+  }, [status, loading, liveConnected, kasDataError, nextAutoCycleAt, cycleIntervalMs, runCycle, runtimeHydrated]);
 
   const handleQueueSign = (item: any) => { setSigningItem(item); };
   const handleQueueReject = (id: string) => { setQueue((p: any)=>p.map((q: any)=>q.id===id?{...q,status:"rejected"}:q)); addLog({type:"SIGN", msg:`Transaction rejected by operator: ${id}`, fee:null}); };

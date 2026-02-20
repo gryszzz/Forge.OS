@@ -11,16 +11,26 @@ export type UsageState = {
   locked: boolean;
 };
 
-const STORAGE_KEY = "forgeos.usage.v1";
+const STORAGE_KEY_PREFIX = "forgeos.usage.v2";
+const LEGACY_STORAGE_KEY = "forgeos.usage.v1";
+
+function normalizeScope(scope?: string) {
+  const raw = String(scope || "global").trim().toLowerCase();
+  return raw.replace(/[^a-z0-9:_-]/g, "_").slice(0, 128) || "global";
+}
+
+function storageKey(scope?: string) {
+  return `${STORAGE_KEY_PREFIX}:${normalizeScope(scope)}`;
+}
 
 function getDayStamp(now = new Date()) {
   return now.toISOString().slice(0, 10);
 }
 
-function safeRead(): UsageRecord | null {
+function safeRead(scope?: string): UsageRecord | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey(scope));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as UsageRecord;
     if (!parsed || typeof parsed.day !== "string" || !Number.isFinite(parsed.used)) return null;
@@ -30,25 +40,38 @@ function safeRead(): UsageRecord | null {
   }
 }
 
-function safeWrite(record: UsageRecord) {
+function safeWrite(record: UsageRecord, scope?: string) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
+    window.localStorage.setItem(storageKey(scope), JSON.stringify(record));
   } catch {
     // Ignore storage write failures.
   }
 }
 
-function normalizeRecord(limit: number): UsageRecord {
+function readLegacyRecordIfPresent(): UsageRecord | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as UsageRecord;
+    if (!parsed || typeof parsed.day !== "string" || !Number.isFinite(parsed.used)) return null;
+    return { day: parsed.day, used: Math.max(0, Math.floor(parsed.used)) };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeRecord(limit: number, scope?: string): UsageRecord {
   const today = getDayStamp();
-  const existing = safeRead();
+  const existing = safeRead(scope) || (scope ? null : readLegacyRecordIfPresent());
   if (!existing || existing.day !== today) {
     const reset = { day: today, used: 0 };
-    safeWrite(reset);
+    safeWrite(reset, scope);
     return reset;
   }
   const clamped = { day: today, used: Math.min(existing.used, Math.max(0, Math.floor(limit))) };
-  safeWrite(clamped);
+  safeWrite(clamped, scope);
   return clamped;
 }
 
@@ -65,18 +88,21 @@ function toState(record: UsageRecord, limit: number): UsageState {
   };
 }
 
-export function getUsageState(limit: number): UsageState {
-  return toState(normalizeRecord(limit), limit);
+export function getScopedUsageState(limit: number, scope?: string): UsageState {
+  return toState(normalizeRecord(limit, scope), limit);
 }
 
-export function consumeUsageCycle(limit: number): UsageState {
-  const record = normalizeRecord(limit);
+export function consumeUsageCycle(limit: number, scope?: string): UsageState {
+  const record = normalizeRecord(limit, scope);
   const safeLimit = Math.max(1, Math.floor(limit));
   if (record.used >= safeLimit) {
     return toState(record, safeLimit);
   }
   const next = { ...record, used: record.used + 1 };
-  safeWrite(next);
+  safeWrite(next, scope);
   return toState(next, safeLimit);
 }
 
+export function getUsageState(limit: number, scope?: string): UsageState {
+  return getScopedUsageState(limit, scope);
+}

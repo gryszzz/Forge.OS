@@ -1,0 +1,88 @@
+type PersistedDashboardState = {
+  status?: "RUNNING" | "PAUSED" | "SUSPENDED";
+  execMode?: "autonomous" | "manual" | "notify";
+  liveExecutionArmed?: boolean;
+  queue?: any[];
+  log?: any[];
+  decisions?: any[];
+  nextAutoCycleAt?: number;
+  updatedAt?: number;
+  version?: number;
+};
+
+const STORAGE_PREFIX = "forgeos.dashboard.v1";
+const MAX_QUEUE_ENTRIES = 160;
+const MAX_LOG_ENTRIES = 320;
+const MAX_DECISION_ENTRIES = 120;
+
+function normalizeScope(scope: string) {
+  return String(scope || "default")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9:_-]/g, "_")
+    .slice(0, 180);
+}
+
+function storageKey(scope: string) {
+  const normalized = normalizeScope(scope);
+  return `${STORAGE_PREFIX}:${normalized || "default"}`;
+}
+
+function truncateList<T>(value: unknown, maxItems: number): T[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, maxItems);
+}
+
+function sanitize(state: PersistedDashboardState): PersistedDashboardState {
+  return {
+    version: 1,
+    updatedAt: Date.now(),
+    status:
+      state.status === "RUNNING" || state.status === "PAUSED" || state.status === "SUSPENDED"
+        ? state.status
+        : "RUNNING",
+    execMode:
+      state.execMode === "autonomous" || state.execMode === "manual" || state.execMode === "notify"
+        ? state.execMode
+        : "manual",
+    liveExecutionArmed: Boolean(state.liveExecutionArmed),
+    nextAutoCycleAt:
+      Number.isFinite(state.nextAutoCycleAt) && Number(state.nextAutoCycleAt) > 0
+        ? Number(state.nextAutoCycleAt)
+        : undefined,
+    queue: truncateList(state.queue, MAX_QUEUE_ENTRIES),
+    log: truncateList(state.log, MAX_LOG_ENTRIES),
+    decisions: truncateList(state.decisions, MAX_DECISION_ENTRIES),
+  };
+}
+
+export function readPersistedDashboardState(scope: string): PersistedDashboardState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(storageKey(scope));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedDashboardState;
+    return sanitize(parsed);
+  } catch {
+    return null;
+  }
+}
+
+export function writePersistedDashboardState(scope: string, state: PersistedDashboardState) {
+  if (typeof window === "undefined") return;
+  try {
+    const payload = sanitize(state);
+    window.localStorage.setItem(storageKey(scope), JSON.stringify(payload));
+  } catch {
+    // Ignore storage failures to avoid blocking runtime logic.
+  }
+}
+
+export function clearPersistedDashboardState(scope: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(storageKey(scope));
+  } catch {
+    // Ignore storage failures.
+  }
+}

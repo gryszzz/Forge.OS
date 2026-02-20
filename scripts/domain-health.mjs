@@ -36,11 +36,59 @@ async function fetchSafe(url) {
       status: res.status,
       location: res.headers.get("location") || "",
       server: res.headers.get("server") || "",
+      body,
       bodySample: body.slice(0, 500).toLowerCase(),
     };
   } catch (error) {
     return { ok: false, error: error?.message || "HTTP_ERROR" };
   }
+}
+
+function extractModuleEntryUrl(baseUrl, html) {
+  const match = String(html || "").match(
+    /<script[^>]*type=["']module["'][^>]*src=["']([^"']+)["'][^>]*>/i
+  );
+  if (!match?.[1]) return null;
+  try {
+    return new URL(match[1], baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
+async function checkManifestAssets(baseOrigin) {
+  const manifestUrl = `${baseOrigin}/manifest.json`;
+  const manifestResponse = await fetchSafe(manifestUrl);
+  if (!manifestResponse.ok || manifestResponse.status !== 200) {
+    return { ok: false, reason: `manifest unavailable (${manifestResponse.ok ? manifestResponse.status : manifestResponse.error})` };
+  }
+
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestResponse.body || "{}");
+  } catch {
+    return { ok: false, reason: "manifest parse failed" };
+  }
+
+  const files = [...new Set(Object.values(manifest || {}).map((value) => value?.file).filter(Boolean))];
+  if (files.length === 0) {
+    return { ok: false, reason: "manifest has no files" };
+  }
+
+  const missing = [];
+  for (const file of files) {
+    const assetUrl = `${baseOrigin}/${String(file).replace(/^\//, "")}`;
+    const assetResponse = await fetchSafe(assetUrl);
+    if (!assetResponse.ok || assetResponse.status !== 200) {
+      missing.push(`${assetUrl} (${assetResponse.ok ? assetResponse.status : assetResponse.error})`);
+    }
+  }
+
+  return {
+    ok: missing.length === 0,
+    reason: missing.length > 0 ? `missing assets: ${missing.slice(0, 4).join(", ")}` : "",
+    fileCount: files.length,
+  };
 }
 
 function hasAll(actualValues, expectedSet) {
@@ -96,17 +144,41 @@ async function main() {
   if (httpsWww.ok) console.log(`https://${alt} -> ${httpsWww.status}${httpsWww.location ? ` (${httpsWww.location})` : ""}`);
   else console.log(`https://${alt} -> error (${httpsWww.error})`);
 
+  printSection("App Artifact Integrity");
+  const moduleEntryUrl = httpsRoot.ok ? extractModuleEntryUrl(`https://${domain}`, httpsRoot.body) : null;
+  let moduleEntryLeak = false;
+  if (!moduleEntryUrl) {
+    console.log("Module entry script tag found: NO");
+  } else {
+    console.log(`Module entry script: ${moduleEntryUrl}`);
+    const entryResponse = await fetchSafe(moduleEntryUrl);
+    const entryOk = entryResponse.ok && entryResponse.status === 200;
+    moduleEntryLeak =
+      entryResponse.ok &&
+      (entryResponse.bodySample.includes("127.0.0.1") || entryResponse.bodySample.includes("src/main.tsx"));
+    console.log(`Entry script reachable: ${entryOk ? "YES" : `NO (${entryResponse.ok ? entryResponse.status : entryResponse.error})`}`);
+    console.log(`Localhost/module-dev leak in entry: ${moduleEntryLeak ? "YES (ERROR)" : "NO"}`);
+  }
+
+  const manifestCheck = await checkManifestAssets(`https://${domain}`);
+  console.log(`Manifest and asset graph healthy: ${manifestCheck.ok ? `YES (${manifestCheck.fileCount} files)` : `NO (${manifestCheck.reason})`}`);
+
   printSection("Readiness");
   const aReady = a.ok && hasAll(a.values, GITHUB_PAGES_A);
   const aaaaReady = aaaa.ok && hasAll(aaaa.values, GITHUB_PAGES_AAAA);
   const cnameReady =
     altCname.ok && altCname.values.some((v) => normalizeHost(v) === "gryszzz.github.io");
   const httpsReady = httpsRoot.ok && httpsRoot.status >= 200 && httpsRoot.status < 500;
+  const moduleEntryReady = Boolean(moduleEntryUrl);
+  const manifestReady = manifestCheck.ok;
+  const localhostLeak = moduleEntryLeak;
 
   console.log(`A records match GitHub Pages: ${aReady ? "YES" : "NO"}`);
   console.log(`AAAA records match GitHub Pages: ${aaaaReady ? "YES" : "NO (optional for launch)"}`);
   console.log(`www CNAME -> gryszzz.github.io: ${cnameReady ? "YES" : "NO"}`);
   console.log(`HTTPS root reachable: ${httpsReady ? "YES" : "NO"}`);
+  console.log(`Module entry script present: ${moduleEntryReady ? "YES" : "NO"}`);
+  console.log(`Manifest asset graph healthy: ${manifestReady ? "YES" : "NO"}`);
 
   if (!ns.ok && (a.error === "ENOTFOUND" || a.error === "ENODATA" || a.error === "ENOTIMP")) {
     console.log("Status: Domain delegation appears pending. This is common right after registration.");
@@ -114,10 +186,14 @@ async function main() {
     return;
   }
 
-  const hasGitHubNotFoundBody = (sample) =>
-    String(sample || "").includes("there isn't a github pages site here") ||
-    String(sample || "").includes("site not found") ||
-    String(sample || "").includes("github pages");
+  const hasGitHubNotFoundBody = (sample) => {
+    const normalized = String(sample || "").toLowerCase();
+    return (
+      normalized.includes("there isn't a github pages site here") ||
+      normalized.includes("site not found") ||
+      normalized.includes("github pages")
+    );
+  };
 
   const github404 =
     (httpRoot.ok &&
@@ -137,7 +213,13 @@ async function main() {
     return;
   }
 
-  if (!aReady || !cnameReady || !httpsReady) {
+  if (localhostLeak) {
+    console.log("Status: App entry appears to reference localhost/dev modules. Rebuild and redeploy production artifacts.");
+    process.exitCode = 1;
+    return;
+  }
+
+  if (!aReady || !cnameReady || !httpsReady || !moduleEntryReady || !manifestReady) {
     console.log("Status: Partial configuration. See docs/ops/custom-domain.md.");
     process.exitCode = 1;
     return;
