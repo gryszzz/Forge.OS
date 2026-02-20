@@ -10,6 +10,8 @@ export default defineConfig({
   build: {
     manifest: "manifest.json",
     sourcemap: false,
+    // Keep prior hashed assets in dist for safer GitHub Pages cache rollover.
+    emptyOutDir: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
