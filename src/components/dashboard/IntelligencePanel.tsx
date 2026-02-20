@@ -20,6 +20,7 @@ export function IntelligencePanel({decisions, loading, onRun}: any) {
   const latest = decisions[0];
   const dec = latest?.dec;
   const ac = dec?.action==="ACCUMULATE"?C.ok:dec?.action==="REDUCE"?C.danger:dec?.action==="REBALANCE"?C.purple:C.warn;
+  const source = String(dec?.decision_source || latest?.source || "ai");
 
   return(
     <div>
@@ -53,6 +54,7 @@ export function IntelligencePanel({decisions, loading, onRun}: any) {
               <div style={{display:"flex", gap:8, alignItems:"center", flexWrap:"wrap"}}>
                 <Badge text={dec.action} color={ac}/>
                 <Badge text={dec.strategy_phase} color={C.purple}/>
+                <Badge text={`SOURCE ${source.toUpperCase()}`} color={source === "fallback" ? C.warn : C.ok}/>
                 <span style={{fontSize:11, color:C.dim, ...mono}}>{fmtT(latest.ts)}</span>
               </div>
               <div style={{display:"flex", gap:8}}>
@@ -84,6 +86,9 @@ export function IntelligencePanel({decisions, loading, onRun}: any) {
             <div style={{background:C.s2, borderRadius:4, padding:"10px 14px", marginBottom:12}}>
               <Label>Decision Rationale</Label>
               <div style={{fontSize:13, color:C.text, lineHeight:1.5}}>{dec.rationale}</div>
+              {dec.decision_source_detail && (
+                <div style={{fontSize:11, color:C.dim, marginTop:8, ...mono}}>source detail: {dec.decision_source_detail}</div>
+              )}
             </div>
 
             {/* Risk factors */}
@@ -110,10 +115,14 @@ export function IntelligencePanel({decisions, loading, onRun}: any) {
               </div>
               {decisions.slice(1).map((d: any, i: number)=>{
                 const c = d.dec.action==="ACCUMULATE"?C.ok:d.dec.action==="REDUCE"?C.danger:C.warn;
+                const historySource = String(d?.dec?.decision_source || d?.source || "ai");
                 return(
                   <div key={i} style={{display:"grid", gridTemplateColumns:historyCols, gap:10, padding:"9px 16px", borderBottom:`1px solid ${C.border}`, alignItems:"center"}}>
                     <span style={{fontSize:11, color:C.dim, ...mono}}>{fmtT(d.ts)}</span>
-                    <Badge text={d.dec.action} color={c}/>
+                    <div style={{display:"flex", gap:6, alignItems:"center"}}>
+                      <Badge text={d.dec.action} color={c}/>
+                      {!isMobile && <Badge text={historySource === "fallback" ? "F" : "AI"} color={historySource === "fallback" ? C.warn : C.ok}/>}
+                    </div>
                     {!isMobile && <span style={{fontSize:12, color:C.text, ...mono}}>{d.dec.capital_allocation_kas} KAS</span>}
                     {!isMobile && <span style={{fontSize:12, color:d.dec.confidence_score>=0.8?C.ok:C.warn, ...mono}}>c:{d.dec.confidence_score}</span>}
                     <span style={{fontSize:11, color:C.dim, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{d.dec.rationale}</span>

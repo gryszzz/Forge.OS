@@ -62,6 +62,9 @@ function sanitizeDecision(raw: any, agent: any) {
   const riskFactors = Array.isArray(raw?.risk_factors)
     ? raw.risk_factors.map((v: any) => String(v)).filter(Boolean).slice(0, 5)
     : [];
+  const decisionSourceRaw = String(raw?.decision_source || "ai").toLowerCase();
+  const decisionSource = decisionSourceRaw === "fallback" ? "fallback" : "ai";
+  const decisionSourceDetail = String(raw?.decision_source_detail || "").slice(0, 180);
 
   return {
     action,
@@ -80,6 +83,8 @@ function sanitizeDecision(raw: any, agent: any) {
     rationale: String(raw?.rationale || "No rationale returned by AI engine."),
     risk_factors: riskFactors,
     next_review_trigger: String(raw?.next_review_trigger || "On next cycle or major DAA/price movement."),
+    decision_source: decisionSource,
+    decision_source_detail: decisionSourceDetail,
   };
 }
 
@@ -116,6 +121,8 @@ function buildFallbackDecision(agent: any, kasData: any, reason: string) {
         "Execution remains wallet-signed",
       ],
       next_review_trigger: "Re-run after next DAG refresh or when AI endpoint connectivity is restored.",
+      decision_source: "fallback",
+      decision_source_detail: `fallback_reason:${reason}`,
     },
     agent
   );
@@ -197,7 +204,8 @@ OUTPUT (strict JSON, all fields required):
   if(Array.isArray(data?.content)) {
     try {
       const text = data.content.map((b: any) => b.text || "").join("");
-      return sanitizeDecision(safeJsonParse(text.replace(/```json|```/g, "").trim()), agent);
+      const parsed = safeJsonParse(text.replace(/```json|```/g, "").trim());
+      return sanitizeDecision({ ...parsed, decision_source: "ai" }, agent);
     } catch (err: any) {
       if (AI_FALLBACK_ENABLED) {
         return buildFallbackDecision(agent, kasData, err?.message || "invalid AI payload");
@@ -208,8 +216,8 @@ OUTPUT (strict JSON, all fields required):
 
   // Backend-proxy shape: { decision: {...} } or direct JSON decision object.
   try {
-    if(data?.decision) return sanitizeDecision(data.decision, agent);
-    return sanitizeDecision(data, agent);
+    if(data?.decision) return sanitizeDecision({ ...data.decision, decision_source: "ai" }, agent);
+    return sanitizeDecision({ ...data, decision_source: "ai" }, agent);
   } catch (err: any) {
     if (AI_FALLBACK_ENABLED) {
       return buildFallbackDecision(agent, kasData, err?.message || "invalid decision format");

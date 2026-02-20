@@ -151,6 +151,7 @@ Runtime override:
 - `autonomous`: auto-signs actions below threshold; above threshold queues for manual sign
 - `notify`: decisions generated, no execution broadcast
 - `accumulate-only`: when `VITE_ACCUMULATE_ONLY=true`, non-accumulate actions are forced to hold
+- safety override: when decision source is fallback, auto-approve is disabled for that cycle and manual sign path is required
 
 ## Fee Routing
 Defined in `src/constants.ts`:

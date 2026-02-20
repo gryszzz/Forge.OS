@@ -82,6 +82,11 @@ AI settings:
 - `VITE_ANTHROPIC_API_KEY` (only if calling Anthropic directly from browser)
 - `VITE_AI_FALLBACK_ENABLED` (default `true`, uses conservative deterministic fallback when AI endpoint is unavailable)
 
+Runtime reliability defaults:
+- WebSocket stream auto-reconnect with exponential backoff (dashboard shows retry state)
+- Fallback decisions are clearly tagged in UI (`SOURCE FALLBACK`)
+- Auto-approve is disabled on fallback decisions (manual sign path only)
+
 ## Mainnet/Testnet Runtime Switch
 - Default profile comes from `VITE_KAS_NETWORK`.
 - You can override at runtime:

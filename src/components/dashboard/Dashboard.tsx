@@ -32,6 +32,8 @@ const TreasuryPanel = lazy(() => import("./TreasuryPanel").then((m) => ({ defaul
 
 export function Dashboard({agent, wallet}: any) {
   const LIVE_POLL_MS = 5000;
+  const STREAM_RECONNECT_MAX_DELAY_MS = 12000;
+  const execModeStorageKey = `forgeos.execMode.${agent?.agentId || agent?.name || "default"}`;
   const [tab, setTab] = useState("overview");
   const [status, setStatus] = useState("RUNNING");
   const [log, setLog] = useState(()=>seedLog(agent.name));
@@ -46,6 +48,7 @@ export function Dashboard({agent, wallet}: any) {
   const [kasDataError, setKasDataError] = useState(null as any);
   const [liveConnected, setLiveConnected] = useState(false);
   const [streamConnected, setStreamConnected] = useState(false);
+  const [streamRetryCount, setStreamRetryCount] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1200
   );
@@ -67,6 +70,27 @@ export function Dashboard({agent, wallet}: any) {
     setKasDataLoading(false);
   },[wallet]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem(execModeStorageKey);
+      if (saved && EXEC_OPTS.some((opt) => opt.v === saved)) {
+        setExecMode(saved);
+      }
+    } catch {
+      // Ignore localStorage read issues in restricted environments.
+    }
+  }, [execModeStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(execModeStorageKey, execMode);
+    } catch {
+      // Ignore localStorage write issues in restricted environments.
+    }
+  }, [execMode, execModeStorageKey]);
+
   useEffect(()=>{
     refreshKasData();
 
@@ -74,14 +98,32 @@ export function Dashboard({agent, wallet}: any) {
 
     let ws: WebSocket | null = null;
     let wsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-    if(KAS_WS_URL){
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let closedByApp = false;
+    let attempts = 0;
+
+    const scheduleReconnect = () => {
+      if (closedByApp || !KAS_WS_URL) return;
+      const delay = Math.min(STREAM_RECONNECT_MAX_DELAY_MS, 1200 * 2 ** attempts);
+      attempts += 1;
+      setStreamRetryCount(attempts);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connectStream();
+      }, delay);
+    };
+
+    const connectStream = () => {
+      if (!KAS_WS_URL || closedByApp) return;
       ws = new WebSocket(KAS_WS_URL);
 
-      ws.onopen = ()=>{
+      ws.onopen = () => {
+        attempts = 0;
+        setStreamRetryCount(0);
         setStreamConnected(true);
       };
 
-      ws.onmessage = ()=>{
+      ws.onmessage = () => {
         // Keep websocket-triggered refreshes bounded to avoid API flood under bursty feeds.
         if (wsRefreshTimer) return;
         wsRefreshTimer = setTimeout(() => {
@@ -90,20 +132,30 @@ export function Dashboard({agent, wallet}: any) {
         }, 1200);
       };
 
-      ws.onerror = ()=>{
-        setStreamConnected(false);
+      ws.onerror = () => {
+        if (!closedByApp) {
+          setStreamConnected(false);
+        }
       };
 
-      ws.onclose = ()=>{
+      ws.onclose = () => {
         setStreamConnected(false);
+        if (!closedByApp) scheduleReconnect();
       };
-    }
+    };
+
+    if (KAS_WS_URL) connectStream();
 
     return ()=>{
+      closedByApp = true;
       clearInterval(id);
       if (wsRefreshTimer) {
         clearTimeout(wsRefreshTimer);
         wsRefreshTimer = null;
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
       }
       if(ws){
         ws.close();
@@ -142,12 +194,24 @@ export function Dashboard({agent, wallet}: any) {
     addLog({type:"DATA", msg:`Kaspa DAG snapshot: DAA ${kasData?.dag?.daaScore||"—"} · Wallet ${kasData?.walletKas||"—"} KAS`, fee:null});
     try{
       const dec = await runQuantEngine(agent, kasData||{});
+      const decSource = dec?.decision_source === "fallback" ? "fallback" : "ai";
       if (ACCUMULATE_ONLY && !["ACCUMULATE", "HOLD"].includes(dec.action)) {
         dec.action = "HOLD";
         dec.rationale = `${String(dec.rationale || "")} Execution constrained by accumulate-only mode.`.trim();
       }
 
-      addLog({type:"AI", msg:`${dec.action} · Conf ${dec.confidence_score} · Kelly ${(dec.kelly_fraction*100).toFixed(1)}% · Monte Carlo ${dec.monte_carlo_win_pct}% win`, fee:0.12});
+      addLog({
+        type:"AI",
+        msg:`${dec.action} · Conf ${dec.confidence_score} · Kelly ${(dec.kelly_fraction*100).toFixed(1)}% · Monte Carlo ${dec.monte_carlo_win_pct}% win · source:${decSource}`,
+        fee:0.12,
+      });
+      if (decSource === "fallback") {
+        addLog({
+          type:"SYSTEM",
+          msg:`Fallback decision source active (${dec?.decision_source_detail || "ai endpoint unavailable"}). Auto-approve disabled for this cycle.`,
+          fee:null,
+        });
+      }
 
       const confOk = dec.confidence_score>=CONF_THRESHOLD;
       const riskOk = dec.risk_score<=riskThresh;
@@ -165,7 +229,7 @@ export function Dashboard({agent, wallet}: any) {
         addLog({type:"EXEC", msg:"HOLD — waiting for available balance", fee:0.03});
       } else {
         addLog({type:"VALID", msg:`Risk OK (${dec.risk_score}) · Conf OK (${dec.confidence_score}) · Kelly ${(dec.kelly_fraction*100).toFixed(1)}%`, fee:null});
-        setDecisions((p: any)=>[{ts:Date.now(), dec, kasData}, ...p]);
+        setDecisions((p: any)=>[{ts:Date.now(), dec, kasData, source:decSource}, ...p]);
 
         if (execMode === "notify") {
           addLog({type:"EXEC", msg:`NOTIFY mode active — ${dec.action} signal recorded, no transaction broadcast.`, fee:0.01});
@@ -191,7 +255,10 @@ export function Dashboard({agent, wallet}: any) {
             ts:Date.now(),
             dec
           };
-          const isAutoApprove = execMode==="autonomous" && txItem.amount_kas <= autoThresh;
+          const isAutoApprove =
+            execMode==="autonomous" &&
+            txItem.amount_kas <= autoThresh &&
+            decSource === "ai";
           if(isAutoApprove){
             try {
               let txid = "";
@@ -249,6 +316,15 @@ export function Dashboard({agent, wallet}: any) {
   const liveKasNum = Number(kasData?.walletKas || 0);
   const spendableKas = Math.max(0, liveKasNum - RESERVE - NET_FEE);
   const lastDecision = decisions[0]?.dec;
+  const lastDecisionSource = String(lastDecision?.decision_source || decisions[0]?.source || "ai");
+  const streamBadgeText = KAS_WS_URL
+    ? streamConnected
+      ? "STREAM LIVE"
+      : streamRetryCount > 0
+        ? `STREAM RETRY ${streamRetryCount}`
+        : "STREAM DOWN"
+    : "STREAM OFF";
+  const streamBadgeColor = KAS_WS_URL ? (streamConnected ? C.ok : C.warn) : C.dim;
   const TABS = [{k:"overview",l:"OVERVIEW"},{k:"intelligence",l:"INTELLIGENCE"},{k:"queue",l:`QUEUE${pendingCount>0?` (${pendingCount})`:""}`},{k:"treasury",l:"TREASURY"},{k:"wallet",l:"WALLET"},{k:"log",l:"LOG"},{k:"controls",l:"CONTROLS"}];
 
   return(
@@ -267,7 +343,7 @@ export function Dashboard({agent, wallet}: any) {
           <Badge text={ACCUMULATE_ONLY ? "ACCUMULATE-ONLY" : "MULTI-ACTION"} color={ACCUMULATE_ONLY ? C.ok : C.warn}/>
           <Badge text={wallet?.provider?.toUpperCase()||"WALLET"} color={C.purple} dot/>
           <Badge text={liveConnected?"DAG LIVE":"DAG OFFLINE"} color={liveConnected?C.ok:C.danger} dot/>
-          <Badge text={KAS_WS_URL?(streamConnected?"STREAM LIVE":"STREAM DOWN"):"STREAM OFF"} color={KAS_WS_URL?(streamConnected?C.ok:C.warn):C.dim} dot/>
+          <Badge text={streamBadgeText} color={streamBadgeColor} dot/>
         </div>
       </div>
 
@@ -315,6 +391,7 @@ export function Dashboard({agent, wallet}: any) {
                 <Badge text={NETWORK_LABEL.toUpperCase()} color={DEFAULT_BADGE_COLOR(NETWORK_LABEL)} />
                 <Badge text={status} color={status==="RUNNING"?C.ok:C.warn} dot />
                 <Badge text={execMode.toUpperCase()} color={C.accent} />
+                <Badge text={`SOURCE ${lastDecisionSource.toUpperCase()}`} color={lastDecisionSource === "fallback" ? C.warn : C.ok} />
               </div>
             </div>
             <div style={{display:"grid", gridTemplateColumns:isTablet ? "1fr" : "1fr 1fr 1fr", gap:8, marginBottom:10}}>
