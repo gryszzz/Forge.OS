@@ -4,6 +4,7 @@ ForgeOS is a Kaspa-focused, wallet-native AI trading dashboard.
 
 It provides:
 - Wallet-gated access (Kasware, Kaspium, or demo mode)
+- Saved Kaspium address memory scoped by active network profile
 - Agent setup wizard
 - AI decision panel (risk/confidence-based)
 - Runtime network profile switcher (mainnet/testnet) from topbar
@@ -12,6 +13,7 @@ It provides:
 - Wallet and UTXO operations panel
 - Accumulate-only execution mode (buy/stack discipline)
 - Runtime mainnet/testnet profile switching (`?network=mainnet|testnet`)
+- Hardened GitHub Pages bootstrap with automatic stale-bundle recovery
 
 ## Quick Start
 
@@ -34,6 +36,11 @@ npm run dev
 ### Strict Validation
 ```bash
 npm run ci
+```
+
+### Domain Config Guard
+```bash
+npm run verify:domain
 ```
 
 ### Domain Health Check
@@ -96,6 +103,7 @@ Runtime reliability defaults:
 - Daily free-cycle quota enforced at runtime; billing tab prompts upgrade when quota is exhausted
 - Automatic cycle scheduler runs while agent status is `RUNNING`
 - Live execution requires explicit arming in UI and readiness checks (real wallet + DAG live feed)
+- Pages bootstrap retries with cache-busted manifest/module imports on dynamic-import failures after deploy rollovers
 
 ## Mainnet/Testnet Runtime Switch
 - Default profile comes from `VITE_KAS_NETWORK`.

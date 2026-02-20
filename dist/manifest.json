@@ -4,11 +4,11 @@
     "name": "charts-vendor"
   },
   "_main-!~{003}~.js": {
-    "file": "assets/main-C5D9Kymo.css",
+    "file": "assets/main-9TRxJUe-.css",
     "src": "_main-!~{003}~.js"
   },
-  "_main-DkvbF8WC.js": {
-    "file": "assets/main-DkvbF8WC.js",
+  "_main-f6tofv6w.js": {
+    "file": "assets/main-f6tofv6w.js",
     "name": "main",
     "isDynamicEntry": true,
     "imports": [
@@ -21,47 +21,47 @@
       "src/components/dashboard/TreasuryPanel.tsx"
     ],
     "css": [
-      "assets/main-C5D9Kymo.css"
+      "assets/main-9TRxJUe-.css"
     ]
   },
   "index.html": {
-    "file": "assets/index-Yx4Y08Ev.js",
+    "file": "assets/index-B_Rpc-H8.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
     "dynamicImports": [
-      "_main-DkvbF8WC.js"
+      "_main-f6tofv6w.js"
     ]
   },
   "src/components/dashboard/IntelligencePanel.tsx": {
-    "file": "assets/IntelligencePanel-uTU0Gw5F.js",
+    "file": "assets/IntelligencePanel-DUhapNlE.js",
     "name": "IntelligencePanel",
     "src": "src/components/dashboard/IntelligencePanel.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_main-DkvbF8WC.js",
+      "_main-f6tofv6w.js",
       "_charts-vendor-BhZkIRjM.js",
       "index.html"
     ]
   },
   "src/components/dashboard/PerfChart.tsx": {
-    "file": "assets/PerfChart-CetcdA4m.js",
+    "file": "assets/PerfChart-BIbchKtM.js",
     "name": "PerfChart",
     "src": "src/components/dashboard/PerfChart.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_main-DkvbF8WC.js",
+      "_main-f6tofv6w.js",
       "_charts-vendor-BhZkIRjM.js",
       "index.html"
     ]
   },
   "src/components/dashboard/TreasuryPanel.tsx": {
-    "file": "assets/TreasuryPanel-BX3Nohy4.js",
+    "file": "assets/TreasuryPanel-CCYvmrI5.js",
     "name": "TreasuryPanel",
     "src": "src/components/dashboard/TreasuryPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_main-DkvbF8WC.js",
+      "_main-f6tofv6w.js",
       "_charts-vendor-BhZkIRjM.js",
       "index.html"
     ]

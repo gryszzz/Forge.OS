@@ -8,11 +8,12 @@
     "typecheck": "tsc -b --pretty false",
     "build": "npm run typecheck && vite build",
     "build:offline": "npm run build",
+    "verify:domain": "node scripts/verify-domain-config.mjs",
     "smoke": "node scripts/smoke.mjs",
     "domain:check": "node scripts/domain-health.mjs",
     "domain:watch": "node scripts/domain-watch.mjs",
     "preview": "vite preview",
-    "ci": "npm run typecheck && npm run build && npm run smoke"
+    "ci": "npm run verify:domain && npm run typecheck && npm run build && npm run smoke"
   },
   "dependencies": {
     "react": "^18.3.1",

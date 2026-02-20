@@ -31,6 +31,7 @@ body {
   position: relative;
   min-height: 100vh;
   isolation: isolate;
+  overflow: hidden;
   overflow: clip;
 }
 
@@ -245,6 +246,7 @@ body {
 .forge-content {
   position: relative;
   z-index: 1;
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
 }
 
 .forge-topbar {
