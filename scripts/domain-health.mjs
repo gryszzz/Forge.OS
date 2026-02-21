@@ -202,8 +202,10 @@ async function main() {
   printSection("App Artifact Integrity");
   const bootstrap = httpsRoot.ok ? extractModuleBootstrap(`https://${domain}`, httpsRoot.body) : { mode: "none" };
   const moduleEntryUrl = bootstrap.mode === "module-src" ? bootstrap.srcUrl : null;
+  const moduleEntryIsSourcePath = Boolean(moduleEntryUrl && /\/src\/main\.[jt]sx?($|\?)/i.test(moduleEntryUrl));
   let moduleEntryLeak = false;
   let inlineModuleReady = false;
+  let moduleEntryReachable = false;
   if (bootstrap.mode === "none") {
     console.log("Module entry script tag found: NO");
   } else if (bootstrap.mode === "inline-module") {
@@ -216,11 +218,16 @@ async function main() {
     console.log(`Module entry script: ${moduleEntryUrl}`);
     const entryResponse = await fetchSafe(moduleEntryUrl);
     const entryOk = entryResponse.ok && entryResponse.status === 200;
+    moduleEntryReachable = entryOk;
     moduleEntryLeak =
-      entryResponse.ok &&
-      (entryResponse.bodySample.includes("127.0.0.1") || entryResponse.bodySample.includes("src/main.tsx"));
+      moduleEntryIsSourcePath ||
+      (entryResponse.ok &&
+        (entryResponse.bodySample.includes("127.0.0.1") || entryResponse.bodySample.includes("src/main.tsx")));
     console.log(`Entry script reachable: ${entryOk ? "YES" : `NO (${entryResponse.ok ? entryResponse.status : entryResponse.error})`}`);
     console.log(`Localhost/module-dev leak in entry: ${moduleEntryLeak ? "YES (ERROR)" : "NO"}`);
+    if (moduleEntryIsSourcePath) {
+      console.log("Detected source-path bootstrap (/src/main.tsx). This usually indicates GitHub Pages branch-source mode.");
+    }
   }
 
   const manifestCheck = await checkManifestAssets(`https://${domain}`);
@@ -239,7 +246,7 @@ async function main() {
     altCname.ok && altCname.values.some((v) => normalizeHost(v) === "gryszzz.github.io");
   const httpsReady = httpsRoot.ok && httpsRoot.status >= 200 && httpsRoot.status < 500;
   const moduleEntryReady =
-    (bootstrap.mode === "module-src" && Boolean(moduleEntryUrl)) ||
+    (bootstrap.mode === "module-src" && moduleEntryReachable && !moduleEntryIsSourcePath) ||
     (bootstrap.mode === "inline-module" && inlineModuleReady);
   const manifestReady = manifestCheck.ok;
   const localhostLeak = moduleEntryLeak;
@@ -284,20 +291,17 @@ async function main() {
     return;
   }
 
-  if (localhostLeak) {
-    console.log("Status: App entry appears to reference localhost/dev modules. Rebuild and redeploy production artifacts.");
+  const likelyBranchModeMismatch = moduleEntryIsSourcePath;
+  if (likelyBranchModeMismatch) {
+    console.log("Status: GitHub Pages appears to be serving branch mode content (/src/main.tsx bootstrap).");
+    console.log("Action: In Settings -> Pages, set Source to GitHub Actions (disable branch-source Pages builds).");
+    console.log("Then rerun the 'Deploy ForgeOS to GitHub Pages' workflow.");
     process.exitCode = 1;
     return;
   }
 
-  const likelyBranchModeMismatch =
-    httpsRoot.ok &&
-    String(httpsRoot.body || "").includes("/dist/manifest.json") &&
-    !manifestReady;
-  if (likelyBranchModeMismatch) {
-    console.log("Status: GitHub Pages appears to be serving branch mode content with missing dist assets.");
-    console.log("Action: In Settings -> Pages, set Source to GitHub Actions (disable branch-source Pages builds).");
-    console.log("Then rerun the 'Deploy ForgeOS to GitHub Pages' workflow.");
+  if (localhostLeak) {
+    console.log("Status: App entry appears to reference localhost/dev modules. Rebuild and redeploy production artifacts.");
     process.exitCode = 1;
     return;
   }

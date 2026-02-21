@@ -31,13 +31,17 @@ function parseCsv(raw: string | undefined) {
     .filter(Boolean);
 }
 
+function normalizeEndpoint(url: string | undefined) {
+  return String(url || "").trim().replace(/\/+$/, "");
+}
+
 function pickByNetwork(mainnetValue: string | undefined, testnetValue: string | undefined, legacyValue: string | undefined) {
   const scopedValue = IS_TESTNET ? testnetValue : mainnetValue;
   return String(scopedValue || legacyValue || "").trim();
 }
 
 const KAS_API_SCOPED = pickByNetwork(env.VITE_KAS_API_MAINNET, env.VITE_KAS_API_TESTNET, env.VITE_KAS_API);
-export const KAS_API = KAS_API_SCOPED || (IS_TESTNET ? "https://api-tn10.kaspa.org" : "https://api.kaspa.org");
+export const KAS_API = normalizeEndpoint(KAS_API_SCOPED || (IS_TESTNET ? "https://api-tn10.kaspa.org" : "https://api.kaspa.org"));
 
 const KAS_API_FALLBACKS_SCOPED = pickByNetwork(
   env.VITE_KAS_API_FALLBACKS_MAINNET,
@@ -45,14 +49,17 @@ const KAS_API_FALLBACKS_SCOPED = pickByNetwork(
   env.VITE_KAS_API_FALLBACKS
 );
 export const KAS_API_FALLBACKS = parseCsv(KAS_API_FALLBACKS_SCOPED)
-  .filter((entry) => entry !== KAS_API);
+  .map((entry) => normalizeEndpoint(entry))
+  .filter((entry) => entry && entry !== KAS_API);
 
 const EXPLORER_SCOPED = pickByNetwork(
   env.VITE_KAS_EXPLORER_MAINNET,
   env.VITE_KAS_EXPLORER_TESTNET,
   env.VITE_KAS_EXPLORER
 );
-export const EXPLORER = EXPLORER_SCOPED || (IS_TESTNET ? "https://explorer-tn10.kaspa.org" : "https://explorer.kaspa.org");
+export const EXPLORER = normalizeEndpoint(
+  EXPLORER_SCOPED || (IS_TESTNET ? "https://explorer-tn10.kaspa.org" : "https://explorer.kaspa.org")
+);
 
 export const KAS_WS_URL = pickByNetwork(env.VITE_KAS_WS_URL_MAINNET, env.VITE_KAS_WS_URL_TESTNET, env.VITE_KAS_WS_URL);
 export const KASPIUM_DEEP_LINK_SCHEME = env.VITE_KASPIUM_DEEP_LINK_SCHEME || "kaspium://";

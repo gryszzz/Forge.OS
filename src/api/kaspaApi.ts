@@ -38,8 +38,15 @@ function endpointNetworkHint(root: string): NetworkHint {
 
 function pathNetworkHint(path: string): NetworkHint {
   const value = String(path || "").toLowerCase();
-  if(value.includes("/addresses/kaspatest:")) return "testnet";
-  if(value.includes("/addresses/kaspa:")) return "mainnet";
+  if(value.includes("/addresses/kaspatest:") || value.includes("/addresses/kaspatest%3a")) return "testnet";
+  if(value.includes("/addresses/kaspa:") || value.includes("/addresses/kaspa%3a")) return "mainnet";
+  try {
+    const decoded = decodeURIComponent(value);
+    if(decoded.includes("/addresses/kaspatest:")) return "testnet";
+    if(decoded.includes("/addresses/kaspa:")) return "mainnet";
+  } catch {
+    // Ignore malformed URI sequences and fall back to unknown.
+  }
   return "unknown";
 }
 
@@ -89,9 +96,11 @@ async function fetchJson(path: string) {
         return await res.json();
       } catch(err: any) {
         const isTimeout = err?.name === "AbortError";
-        const status = Number(err?.message || 0);
+        const rawMessage = String(err?.message || "");
+        const status = Number(rawMessage || 0);
         const isRetryableStatus = RETRYABLE_STATUSES.has(status);
-        const canRetry = attempt + 1 < MAX_ATTEMPTS_PER_ROOT && (isTimeout || isRetryableStatus);
+        const isNetworkError = err?.name === "TypeError" || /failed to fetch|network|load failed/i.test(rawMessage);
+        const canRetry = attempt + 1 < MAX_ATTEMPTS_PER_ROOT && (isTimeout || isRetryableStatus || isNetworkError);
 
         if (canRetry) {
           await sleep(retryDelayMs(attempt));
@@ -100,8 +109,10 @@ async function fetchJson(path: string) {
 
         if(isTimeout) {
           errors.push(`${root} timeout (${REQUEST_TIMEOUT_MS}ms, attempt ${attemptLabel})`);
+        } else if (isNetworkError) {
+          errors.push(`${root} network_error (${rawMessage || "request_failed"}, attempt ${attemptLabel})`);
         } else {
-          errors.push(`${root} ${err?.message || "request_failed"} (attempt ${attemptLabel})`);
+          errors.push(`${root} ${rawMessage || "request_failed"} (attempt ${attemptLabel})`);
         }
         break;
       } finally {
