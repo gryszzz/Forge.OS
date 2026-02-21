@@ -3,17 +3,13 @@
     "file": "assets/charts-vendor-BhZkIRjM.js",
     "name": "charts-vendor"
   },
-  "_main-!~{003}~.js": {
-    "file": "assets/main-9TRxJUe-.css",
-    "src": "_main-!~{003}~.js"
-  },
-  "_main-C0Zt4nDY.js": {
-    "file": "assets/main-C0Zt4nDY.js",
-    "name": "main",
-    "isDynamicEntry": true,
+  "index.html": {
+    "file": "assets/index-Dn_znqGQ.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
     "imports": [
-      "_charts-vendor-BhZkIRjM.js",
-      "index.html"
+      "_charts-vendor-BhZkIRjM.js"
     ],
     "dynamicImports": [
       "src/components/dashboard/PerfChart.tsx",
@@ -21,49 +17,37 @@
       "src/components/dashboard/TreasuryPanel.tsx"
     ],
     "css": [
-      "assets/main-9TRxJUe-.css"
-    ]
-  },
-  "index.html": {
-    "file": "assets/index-llqkZ_pf.js",
-    "name": "index",
-    "src": "index.html",
-    "isEntry": true,
-    "dynamicImports": [
-      "_main-C0Zt4nDY.js"
+      "assets/index-B-kpPEVn.css"
     ]
   },
   "src/components/dashboard/IntelligencePanel.tsx": {
-    "file": "assets/IntelligencePanel-DoNTnCIo.js",
+    "file": "assets/IntelligencePanel-BnRgS_Dz.js",
     "name": "IntelligencePanel",
     "src": "src/components/dashboard/IntelligencePanel.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_main-C0Zt4nDY.js",
-      "_charts-vendor-BhZkIRjM.js",
-      "index.html"
+      "index.html",
+      "_charts-vendor-BhZkIRjM.js"
     ]
   },
   "src/components/dashboard/PerfChart.tsx": {
-    "file": "assets/PerfChart-C-LVJ_uw.js",
+    "file": "assets/PerfChart-CDjm1jZm.js",
     "name": "PerfChart",
     "src": "src/components/dashboard/PerfChart.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_main-C0Zt4nDY.js",
-      "_charts-vendor-BhZkIRjM.js",
-      "index.html"
+      "index.html",
+      "_charts-vendor-BhZkIRjM.js"
     ]
   },
   "src/components/dashboard/TreasuryPanel.tsx": {
-    "file": "assets/TreasuryPanel-BCHri21N.js",
+    "file": "assets/TreasuryPanel-C6XeHgmb.js",
     "name": "TreasuryPanel",
     "src": "src/components/dashboard/TreasuryPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_main-C0Zt4nDY.js",
-      "_charts-vendor-BhZkIRjM.js",
-      "index.html"
+      "index.html",
+      "_charts-vendor-BhZkIRjM.js"
     ]
   }
 }

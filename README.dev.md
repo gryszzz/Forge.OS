@@ -82,6 +82,14 @@ Production assets are generated in `dist/`.
 Defined in `.env.example`.
 
 Kaspa network:
+- `VITE_KAS_API_MAINNET`
+- `VITE_KAS_API_TESTNET`
+- `VITE_KAS_API_FALLBACKS_MAINNET` (comma-separated backup endpoints)
+- `VITE_KAS_API_FALLBACKS_TESTNET` (comma-separated backup endpoints)
+- `VITE_KAS_EXPLORER_MAINNET`
+- `VITE_KAS_EXPLORER_TESTNET`
+- `VITE_KAS_WS_URL_MAINNET`
+- `VITE_KAS_WS_URL_TESTNET`
 - `VITE_KAS_API`
 - `VITE_KAS_API_FALLBACKS` (comma-separated backup endpoints)
 - `VITE_KAS_EXPLORER`
@@ -110,6 +118,8 @@ Monetization / quota:
 - `VITE_BILLING_CONTACT` (support label shown in billing panel)
 
 Runtime override:
+- Default profile is `VITE_KAS_NETWORK` (set to `mainnet` in `.env.example`).
+- For production, configure network-scoped endpoint vars so runtime switching stays on the correct chain.
 - Append `?network=mainnet` or `?network=testnet` to force a network profile without rebuilding.
 - The app persists active selection in local storage key `forgeos.network`.
 

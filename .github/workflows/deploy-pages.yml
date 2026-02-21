@@ -52,21 +52,32 @@ jobs:
             echo "No custom domain file detected; using project base path"
           fi
 
-      - name: Build (testnet config)
+      - name: Build (mainnet default config)
         env:
           VITE_BASE_PATH: ${{ env.VITE_BASE_PATH }}
-          VITE_KAS_API: ${{ vars.VITE_KAS_API || 'https://api-tn10.kaspa.org' }}
-          VITE_KAS_API_FALLBACKS: ${{ vars.VITE_KAS_API_FALLBACKS || 'https://api.kaspa.org' }}
-          VITE_KAS_EXPLORER: ${{ vars.VITE_KAS_EXPLORER || 'https://explorer-tn10.kaspa.org' }}
-          VITE_KAS_NETWORK: ${{ vars.VITE_KAS_NETWORK || 'kaspa_testnet_10' }}
-          VITE_KAS_NETWORK_LABEL: ${{ vars.VITE_KAS_NETWORK_LABEL || 'Kaspa Testnet 10' }}
+          VITE_KAS_API_MAINNET: ${{ vars.VITE_KAS_API_MAINNET || vars.VITE_KAS_API || 'https://api.kaspa.org' }}
+          VITE_KAS_API_TESTNET: ${{ vars.VITE_KAS_API_TESTNET || 'https://api-tn10.kaspa.org' }}
+          VITE_KAS_API_FALLBACKS_MAINNET: ${{ vars.VITE_KAS_API_FALLBACKS_MAINNET || vars.VITE_KAS_API_FALLBACKS || '' }}
+          VITE_KAS_API_FALLBACKS_TESTNET: ${{ vars.VITE_KAS_API_FALLBACKS_TESTNET || '' }}
+          VITE_KAS_EXPLORER_MAINNET: ${{ vars.VITE_KAS_EXPLORER_MAINNET || vars.VITE_KAS_EXPLORER || 'https://explorer.kaspa.org' }}
+          VITE_KAS_EXPLORER_TESTNET: ${{ vars.VITE_KAS_EXPLORER_TESTNET || 'https://explorer-tn10.kaspa.org' }}
+          VITE_KAS_WS_URL_MAINNET: ${{ vars.VITE_KAS_WS_URL_MAINNET || vars.VITE_KAS_WS_URL || '' }}
+          VITE_KAS_WS_URL_TESTNET: ${{ vars.VITE_KAS_WS_URL_TESTNET || '' }}
+          # Legacy vars kept for backward compatibility.
+          VITE_KAS_API: ${{ vars.VITE_KAS_API || 'https://api.kaspa.org' }}
+          VITE_KAS_API_FALLBACKS: ${{ vars.VITE_KAS_API_FALLBACKS || '' }}
+          VITE_KAS_EXPLORER: ${{ vars.VITE_KAS_EXPLORER || 'https://explorer.kaspa.org' }}
           VITE_KAS_WS_URL: ${{ vars.VITE_KAS_WS_URL || '' }}
+          VITE_KAS_NETWORK: ${{ vars.VITE_KAS_NETWORK || 'mainnet' }}
+          VITE_KAS_NETWORK_LABEL: ${{ vars.VITE_KAS_NETWORK_LABEL || 'Kaspa Mainnet' }}
           VITE_KAS_ENFORCE_WALLET_NETWORK: ${{ vars.VITE_KAS_ENFORCE_WALLET_NETWORK || 'true' }}
           VITE_ACCUMULATE_ONLY: ${{ vars.VITE_ACCUMULATE_ONLY || 'true' }}
           VITE_TREASURY_ADDRESS_MAINNET: ${{ vars.VITE_TREASURY_ADDRESS_MAINNET || 'kaspa:qpv7fcvdlz6th4hqjtm9qkkms2dw0raem963x3hm8glu3kjgj7922vy69hv85' }}
-          VITE_TREASURY_ADDRESS_TESTNET: ${{ vars.VITE_TREASURY_ADDRESS_TESTNET || 'kaspatest:qpv7fcvdlz6th4hqjtm9qkkms2dw0raem963x3hm8glu3kjgj7922vy69hv85' }}
+          VITE_TREASURY_ADDRESS_TESTNET: ${{ vars.VITE_TREASURY_ADDRESS_TESTNET || 'kaspatest:qpqz2vxj23kvh0m73ta2jjn2u4cv4tlufqns2eap8mxyyt0rvrxy6ejkful67' }}
           VITE_ACCUMULATION_ADDRESS_MAINNET: ${{ vars.VITE_ACCUMULATION_ADDRESS_MAINNET || vars.VITE_TREASURY_ADDRESS_MAINNET || 'kaspa:qpv7fcvdlz6th4hqjtm9qkkms2dw0raem963x3hm8glu3kjgj7922vy69hv85' }}
-          VITE_ACCUMULATION_ADDRESS_TESTNET: ${{ vars.VITE_ACCUMULATION_ADDRESS_TESTNET || vars.VITE_TREASURY_ADDRESS_TESTNET || 'kaspatest:qpv7fcvdlz6th4hqjtm9qkkms2dw0raem963x3hm8glu3kjgj7922vy69hv85' }}
+          VITE_ACCUMULATION_ADDRESS_TESTNET: ${{ vars.VITE_ACCUMULATION_ADDRESS_TESTNET || vars.VITE_TREASURY_ADDRESS_TESTNET || 'kaspatest:qpqz2vxj23kvh0m73ta2jjn2u4cv4tlufqns2eap8mxyyt0rvrxy6ejkful67' }}
+          VITE_DEMO_ADDRESS_MAINNET: ${{ vars.VITE_DEMO_ADDRESS_MAINNET || vars.VITE_TREASURY_ADDRESS_MAINNET || 'kaspa:qpv7fcvdlz6th4hqjtm9qkkms2dw0raem963x3hm8glu3kjgj7922vy69hv85' }}
+          VITE_DEMO_ADDRESS_TESTNET: ${{ vars.VITE_DEMO_ADDRESS_TESTNET || vars.VITE_TREASURY_ADDRESS_TESTNET || 'kaspatest:qpqz2vxj23kvh0m73ta2jjn2u4cv4tlufqns2eap8mxyyt0rvrxy6ejkful67' }}
           VITE_FEE_RATE: ${{ vars.VITE_FEE_RATE || '0.20' }}
           VITE_TREASURY_SPLIT: ${{ vars.VITE_TREASURY_SPLIT || '0.30' }}
         run: npm run build

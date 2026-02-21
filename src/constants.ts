@@ -15,31 +15,57 @@ function runtimeNetworkOverride() {
 }
 
 const RUNTIME_NETWORK_OVERRIDE = runtimeNetworkOverride();
-const ACTIVE_NETWORK = RUNTIME_NETWORK_OVERRIDE || env.VITE_KAS_NETWORK || "kaspa_testnet_10";
+const ACTIVE_NETWORK = RUNTIME_NETWORK_OVERRIDE || env.VITE_KAS_NETWORK || "mainnet";
 export const NETWORK_PROFILE = resolveKaspaNetwork(ACTIVE_NETWORK);
 export const DEFAULT_NETWORK = NETWORK_PROFILE.id;
+const IS_TESTNET = DEFAULT_NETWORK.startsWith("testnet");
 export const NETWORK_LABEL = RUNTIME_NETWORK_OVERRIDE
   ? NETWORK_PROFILE.label
   : (env.VITE_KAS_NETWORK_LABEL || NETWORK_PROFILE.label);
 export const ALLOWED_ADDRESS_PREFIXES = NETWORK_PROFILE.addressPrefixes;
 
-export const KAS_API =
-  env.VITE_KAS_API ||
-  (DEFAULT_NETWORK.startsWith("testnet") ? "https://api-tn10.kaspa.org" : "https://api.kaspa.org");
-export const KAS_API_FALLBACKS = String(env.VITE_KAS_API_FALLBACKS || "")
-  .split(",")
-  .map((entry) => entry.trim())
-  .filter(Boolean);
+function parseCsv(raw: string | undefined) {
+  return String(raw || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
 
-export const EXPLORER =
-  env.VITE_KAS_EXPLORER ||
-  (DEFAULT_NETWORK.startsWith("testnet") ? "https://explorer-tn10.kaspa.org" : "https://explorer.kaspa.org");
-export const KAS_WS_URL = env.VITE_KAS_WS_URL || "";
+function pickByNetwork(mainnetValue: string | undefined, testnetValue: string | undefined, legacyValue: string | undefined) {
+  const scopedValue = IS_TESTNET ? testnetValue : mainnetValue;
+  return String(scopedValue || legacyValue || "").trim();
+}
+
+const KAS_API_SCOPED = pickByNetwork(env.VITE_KAS_API_MAINNET, env.VITE_KAS_API_TESTNET, env.VITE_KAS_API);
+export const KAS_API = KAS_API_SCOPED || (IS_TESTNET ? "https://api-tn10.kaspa.org" : "https://api.kaspa.org");
+
+const KAS_API_FALLBACKS_SCOPED = pickByNetwork(
+  env.VITE_KAS_API_FALLBACKS_MAINNET,
+  env.VITE_KAS_API_FALLBACKS_TESTNET,
+  env.VITE_KAS_API_FALLBACKS
+);
+export const KAS_API_FALLBACKS = parseCsv(KAS_API_FALLBACKS_SCOPED)
+  .filter((entry) => entry !== KAS_API);
+
+const EXPLORER_SCOPED = pickByNetwork(
+  env.VITE_KAS_EXPLORER_MAINNET,
+  env.VITE_KAS_EXPLORER_TESTNET,
+  env.VITE_KAS_EXPLORER
+);
+export const EXPLORER = EXPLORER_SCOPED || (IS_TESTNET ? "https://explorer-tn10.kaspa.org" : "https://explorer.kaspa.org");
+
+export const KAS_WS_URL = pickByNetwork(env.VITE_KAS_WS_URL_MAINNET, env.VITE_KAS_WS_URL_TESTNET, env.VITE_KAS_WS_URL);
 export const KASPIUM_DEEP_LINK_SCHEME = env.VITE_KASPIUM_DEEP_LINK_SCHEME || "kaspium://";
 export const ENFORCE_WALLET_NETWORK = String(env.VITE_KAS_ENFORCE_WALLET_NETWORK || "true").toLowerCase() !== "false";
 export const ACCUMULATE_ONLY = String(env.VITE_ACCUMULATE_ONLY || "true").toLowerCase() !== "false";
 
-const IS_TESTNET = DEFAULT_NETWORK.startsWith("testnet");
+const KAS_API_ALL = [KAS_API, ...KAS_API_FALLBACKS]
+  .map((value) => String(value || "").trim())
+  .filter(Boolean);
+const HAS_DUPLICATE_KAS_API_ENDPOINTS = new Set(KAS_API_ALL).size !== KAS_API_ALL.length;
+if (HAS_DUPLICATE_KAS_API_ENDPOINTS) {
+  throw new Error("Duplicate Kaspa API endpoints detected in VITE_KAS_API* configuration.");
+}
 
 function requireKaspaAddress(value: string, allowedPrefixes: string[], label: string) {
   try {

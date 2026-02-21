@@ -67,6 +67,14 @@ npm run preview
 Create a `.env` file from `.env.example` and set values for your target environment.
 
 Core Kaspa settings:
+- `VITE_KAS_API_MAINNET`
+- `VITE_KAS_API_TESTNET`
+- `VITE_KAS_API_FALLBACKS_MAINNET` (comma-separated backup endpoints)
+- `VITE_KAS_API_FALLBACKS_TESTNET` (comma-separated backup endpoints)
+- `VITE_KAS_EXPLORER_MAINNET`
+- `VITE_KAS_EXPLORER_TESTNET`
+- `VITE_KAS_WS_URL_MAINNET`
+- `VITE_KAS_WS_URL_TESTNET`
 - `VITE_KAS_API`
 - `VITE_KAS_API_FALLBACKS` (comma-separated backup endpoints)
 - `VITE_KAS_EXPLORER`
@@ -108,7 +116,8 @@ Runtime reliability defaults:
 - Build-time hashed asset references with strict smoke validation over manifest import graph and dynamic chunk links
 
 ## Mainnet/Testnet Runtime Switch
-- Default profile comes from `VITE_KAS_NETWORK`.
+- Default profile comes from `VITE_KAS_NETWORK` (mainnet in `.env.example`).
+- For production runtime switching, set the network-scoped endpoint vars (`*_MAINNET` + `*_TESTNET`) to prevent cross-network reads.
 - You can override at runtime:
   - `https://<host>/?network=mainnet`
   - `https://<host>/?network=testnet`

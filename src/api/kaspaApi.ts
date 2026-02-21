@@ -1,15 +1,28 @@
-import { KAS_API, KAS_API_FALLBACKS } from "../constants";
+import { DEFAULT_NETWORK, KAS_API, KAS_API_FALLBACKS } from "../constants";
 import { fmt } from "../helpers";
 
 const API_ROOT = String(KAS_API || "").replace(/\/+$/, "");
 const API_ROOTS = Array.from(new Set([API_ROOT, ...KAS_API_FALLBACKS.map((v) => String(v || "").replace(/\/+$/, ""))]))
   .filter(Boolean);
 const REQUEST_TIMEOUT_MS = 12000;
+const MAX_ATTEMPTS_PER_ROOT = 2;
+const RETRY_BASE_DELAY_MS = 250;
+const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 type NetworkHint = "mainnet" | "testnet" | "unknown";
+const PROFILE_NETWORK_HINT: NetworkHint = DEFAULT_NETWORK.startsWith("testnet") ? "testnet" : "mainnet";
 
 function makeUrl(root: string, path: string) {
   return `${root}${path}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelayMs(attempt: number) {
+  const jitter = Math.floor(Math.random() * 120);
+  return RETRY_BASE_DELAY_MS * (attempt + 1) + jitter;
 }
 
 function endpointNetworkHint(root: string): NetworkHint {
@@ -32,11 +45,12 @@ function pathNetworkHint(path: string): NetworkHint {
 
 function resolveApiRoots(path: string) {
   const pathHint = pathNetworkHint(path);
-  if(pathHint === "unknown") return API_ROOTS;
+  const targetHint = pathHint === "unknown" ? PROFILE_NETWORK_HINT : pathHint;
+  if(targetHint === "unknown") return API_ROOTS;
 
   const preferred = API_ROOTS.filter((root) => {
     const endpointHint = endpointNetworkHint(root);
-    return endpointHint === pathHint || endpointHint === "unknown";
+    return endpointHint === targetHint || endpointHint === "unknown";
   });
 
   return preferred.length > 0 ? preferred : API_ROOTS;
@@ -51,29 +65,48 @@ async function fetchJson(path: string) {
   const errors: string[] = [];
 
   for (const root of requestRoots) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_ROOT; attempt += 1) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const attemptLabel = `${attempt + 1}/${MAX_ATTEMPTS_PER_ROOT}`;
 
-    try {
-      const res = await fetch(makeUrl(root, path), {
-        method: "GET",
-        headers: { "Accept": "application/json" },
-        signal: controller.signal,
-      });
+      try {
+        const res = await fetch(makeUrl(root, path), {
+          method: "GET",
+          headers: { "Accept": "application/json" },
+          signal: controller.signal,
+        });
 
-      if(!res.ok) {
-        throw new Error(`${res.status}`);
+        if(!res.ok) {
+          const status = Number(res.status || 0);
+          if (RETRYABLE_STATUSES.has(status) && attempt + 1 < MAX_ATTEMPTS_PER_ROOT) {
+            await sleep(retryDelayMs(attempt));
+            continue;
+          }
+          throw new Error(`${status || "request_failed"}`);
+        }
+
+        return await res.json();
+      } catch(err: any) {
+        const isTimeout = err?.name === "AbortError";
+        const status = Number(err?.message || 0);
+        const isRetryableStatus = RETRYABLE_STATUSES.has(status);
+        const canRetry = attempt + 1 < MAX_ATTEMPTS_PER_ROOT && (isTimeout || isRetryableStatus);
+
+        if (canRetry) {
+          await sleep(retryDelayMs(attempt));
+          continue;
+        }
+
+        if(isTimeout) {
+          errors.push(`${root} timeout (${REQUEST_TIMEOUT_MS}ms, attempt ${attemptLabel})`);
+        } else {
+          errors.push(`${root} ${err?.message || "request_failed"} (attempt ${attemptLabel})`);
+        }
+        break;
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      return await res.json();
-    } catch(err: any) {
-      if(err?.name === "AbortError") {
-        errors.push(`${root} timeout (${REQUEST_TIMEOUT_MS}ms)`);
-      } else {
-        errors.push(`${root} ${err?.message || "request_failed"}`);
-      }
-    } finally {
-      clearTimeout(timeoutId);
     }
   }
 

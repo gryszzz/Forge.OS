@@ -70,7 +70,7 @@ export function tryResolveKaspaNetwork(raw: string | number | undefined | null):
 }
 
 export function resolveKaspaNetwork(raw: string | undefined | null): KaspaNetworkProfile {
-  return tryResolveKaspaNetwork(raw || "testnet-10") || PROFILES[1];
+  return tryResolveKaspaNetwork(raw || "mainnet") || PROFILES[0];
 }
 
 export function isAddressPrefixCompatible(address: string, profile: KaspaNetworkProfile): boolean {
